@@ -6,6 +6,7 @@ import {
   FARMER_FRAME,
   LANDLORD_FRAME,
   sortCardsDesc,
+  CARD_BACK,
 } from './cards.js'
 import { beats, parseCombo } from './rules.js'
 
@@ -107,10 +108,7 @@ export class UI {
         </div>
 
         <div class="chat-panel" id="chat-panel">
-          <div class="chat-head">
-            <span>聊天</span>
-            <button class="chat-new" id="chat-new" data-act="chat-bottom" type="button">新消息 ↓</button>
-          </div>
+          <button class="chat-new" id="chat-new" data-act="chat-bottom" type="button">新消息 ↓</button>
           <div class="chat-list" id="chat-list"></div>
         </div>
 
@@ -320,7 +318,11 @@ export class UI {
         break
       case 'fullscreen':
         if (this.shell.inIframe) {
-          this.shell.fullscreen(true)
+          // 宿主负责真正的全屏切换；这里必须在进入后能发送 false 退出。
+          const next = !this.online.fullscreen
+          this.online.fullscreen = next
+          this.renderTop()
+          this.shell.fullscreen(next)
         } else if (document.fullscreenElement) {
           document.exitFullscreen?.()
         } else {
@@ -467,7 +469,7 @@ export class UI {
     switch (type) {
       case 'match':
         this.selected.clear()
-        this.bottomAnim = null
+        this.cancelBottomAnim()
         this.cancelDealReveal()
         this.dealRevealPending = false
         break
@@ -512,63 +514,121 @@ export class UI {
 
   startBottomDeal(match) {
     if (!match?.landlord) return
-    this.bottomAnim = { matchId: match.id, landlord: match.landlord, until: Date.now() + 330 }
-    // 等当前这次 render 把底牌和座位画出来后再做飞牌动画
-    setTimeout(() => this.animateBottomDeal(match), 0)
+    this.cancelBottomAnim()
+    const anim = {
+      matchId: match.id,
+      landlord: match.landlord,
+      until: Date.now() + 2060,
+      layer: null,
+      timers: [],
+      hideActual: true,
+    }
+    this.bottomAnim = anim
+    // 等本次 state 渲染到底牌后再做翻牌，才能拿到三张底牌的实际位置。
+    anim.timers.push(setTimeout(() => this.animateBottomDeal(match, anim), 0))
   }
 
-  animateBottomDeal(match) {
+  cancelBottomAnim() {
     const anim = this.bottomAnim
-    if (!anim || anim.matchId !== match.id) return
+    if (!anim) return
+    for (const timer of anim.timers || []) clearTimeout(timer)
+    anim.layer?.remove()
+    this.app.querySelector('#bottom-cards')?.classList.remove('revealing')
+    this.bottomAnim = null
+  }
+
+  animateBottomDeal(match, anim) {
+    if (!anim || this.bottomAnim !== anim) return
     const bottomEl = this.app.querySelector('#bottom-cards')
     const srcCards = bottomEl ? [...bottomEl.querySelectorAll('.card')] : []
     const seatEl = this.app.querySelector(`.seat-card[data-seat="${match.landlord}"]`)
     const isBottom = match.landlord === this.viewSeat()
     const targetEl = isBottom ? this.app.querySelector('#hand') : seatEl?.querySelector('.opponent-backs') || seatEl
     if (!srcCards.length || !targetEl) {
-      this.bottomAnim = null
+      this.cancelBottomAnim()
       this.render()
       return
     }
+
     const targetRect = targetEl.getBoundingClientRect()
-    const layer = document.createElement('div')
-    layer.className = 'bottom-fly-layer'
-    this.app.appendChild(layer)
-    bottomEl.classList.add('flying')
     const tx = targetRect.left + targetRect.width / 2
     const ty = targetRect.top + targetRect.height / 2
-    srcCards.slice(0, 3).forEach((card, i) => {
+    const layer = document.createElement('div')
+    layer.className = 'bottom-reveal-layer'
+    this.app.appendChild(layer)
+    anim.layer = layer
+    bottomEl.classList.add('revealing')
+
+    const portrait = this.app.classList.contains('portrait-rotated')
+    const cards = srcCards.slice(0, 3).map((card, i) => {
       const r = card.getBoundingClientRect()
-      const clone = card.cloneNode(true)
-      clone.classList.add('fly-card')
-      clone.style.left = `${r.left}px`
-      clone.style.top = `${r.top}px`
-      clone.style.width = `${r.width}px`
-      clone.style.height = `${r.height}px`
-      layer.appendChild(clone)
-      const dx = tx - (r.left + r.width / 2)
-      const dy = ty - (r.top + r.height / 2)
-      try {
-        clone.animate(
-          [
-            { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-            { transform: `translate(${dx}px, ${dy}px) scale(0.4)`, opacity: 0.2 },
-          ],
-          { duration: 300, delay: i * 20, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' },
-        )
-      } catch {
-        /* 不支持 Element.animate 时直接等计时器更新牌数 */
+      const faceSrc = card.querySelector('img')?.src || ''
+      const outer = document.createElement('div')
+      outer.className = 'reveal-move'
+      outer.style.left = `${r.left}px`
+      outer.style.top = `${r.top}px`
+      outer.style.width = `${r.width}px`
+      outer.style.height = `${r.height}px`
+
+      const inner = document.createElement('div')
+      inner.className = 'reveal-rotate'
+      if (portrait) {
+        // 竖屏旋转容器内，卡牌视觉宽高已经交换；内层先旋转再翻转。
+        inner.style.width = `${r.height}px`
+        inner.style.height = `${r.width}px`
+        inner.style.left = `${(r.width - r.height) / 2}px`
+        inner.style.top = `${(r.height - r.width) / 2}px`
+        inner.style.transform = 'rotate(90deg)'
       }
+
+      const flip = document.createElement('div')
+      flip.className = 'reveal-flip'
+      flip.innerHTML = `
+        <img class="reveal-face back" src="${CARD_BACK}" alt="" />
+        <img class="reveal-face front" src="${faceSrc}" alt="" />
+      `
+      inner.appendChild(flip)
+      outer.appendChild(inner)
+      layer.appendChild(outer)
+      return { outer, flip, rect: r, index: i }
     })
-    const total = 300 + 2 * 20 + 30
-    setTimeout(() => {
-      layer.remove()
-      if (bottomEl) bottomEl.classList.remove('flying')
-      if (this.bottomAnim && this.bottomAnim.matchId === match.id) {
-        this.bottomAnim = null
-        this.render()
+
+    // 先让浏览器绘制背面，再启动 0.5 秒翻转。
+    requestAnimationFrame(() => {
+      if (this.bottomAnim !== anim) return
+      for (const item of cards) item.flip.classList.add('flipped')
+    })
+
+    // 停留 1 秒：翻转 0.5s + 停留 1s = 1.5s 后开始移动。
+    anim.timers.push(setTimeout(() => {
+      if (this.bottomAnim !== anim) return
+      anim.hideActual = false
+      bottomEl.classList.remove('revealing')
+      for (const item of cards) {
+        const r = item.rect
+        const dx = tx - (r.left + r.width / 2)
+        const dy = ty - (r.top + r.height / 2)
+        try {
+          item.outer.animate(
+            [
+              { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+              { transform: `translate(${dx}px, ${dy}px) scale(0.45)`, opacity: 0.15 },
+            ],
+            { duration: 500, delay: item.index * 30, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' },
+          )
+        } catch {
+          /* 不支持 Element.animate 时直接等计时器结束 */
+        }
       }
-    }, total)
+    }, 1500))
+
+    anim.timers.push(setTimeout(() => {
+      if (this.bottomAnim !== anim) return
+      layer.remove()
+      bottomEl.classList.remove('revealing')
+      this.bottomAnim = null
+      this.render()
+    }, 2060))
   }
 
   cancelDealReveal() {
@@ -658,6 +718,8 @@ export class UI {
     conn.textContent = this.online.status === 'offline' && this.online.error ? this.online.error : statusMap[this.online.status] || this.online.status
     conn.className = `conn ${this.online.status}`
     mute.textContent = this.audio.muted ? '🔇' : '🔊'
+    const fullscreenBtn = this.app.querySelector('[data-act="fullscreen"]')
+    if (fullscreenBtn) fullscreenBtn.title = this.online.fullscreen ? '退出全屏' : '全屏'
   }
 
   viewSeat() {
@@ -793,6 +855,7 @@ export class UI {
     } else {
       bottomEl.innerHTML = ''
     }
+    bottomEl.classList.toggle('revealing', !!(this.bottomAnim && this.bottomAnim.hideActual && this.bottomAnim.matchId === m.id))
 
     if (m.phase === 'countdown') {
       statusEl.innerHTML = `<div class="countdown" data-countdown>${Math.ceil(this.online.countdownSeconds())}</div><div class="countdown-label">准备开局</div>`

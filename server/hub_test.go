@@ -838,3 +838,45 @@ func TestCallPasserAndOtherPassEndsBidding(t *testing.T) {
 		t.Fatalf("无人抢地主时倍数应为 1，得到 %d", h.match.RobMultiplier)
 	}
 }
+
+func TestFinishedMatchClearedWhenRoomEmpty(t *testing.T) {
+	h := newTestHub(t)
+	h.lock.Lock()
+	h.match = &Match{
+		ID:     99,
+		Phase:  "over",
+		Result: &ResultInfo{WinnerSide: "landlord", Landlord: "a"},
+	}
+	h.lock.Unlock()
+
+	h.lock.Lock()
+	clients := []struct {
+		nick string
+		c    *client
+	}{
+		{"alice", h.clients["alice"]},
+		{"bob", h.clients["bob"]},
+		{"carol", h.clients["carol"]},
+	}
+	h.lock.Unlock()
+	for _, item := range clients {
+		h.removeClient(item.nick, item.c)
+	}
+
+	h.lock.Lock()
+	match := h.match
+	h.lock.Unlock()
+	if match != nil {
+		t.Fatalf("空房间应清理已结束牌局，得到 %+v", match)
+	}
+
+	h.addClient(fakeClient("dave"))
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	if h.match != nil {
+		t.Fatalf("新玩家进入后不应收到上一局结果，得到 %+v", h.match)
+	}
+	if got := h.snapshotLocked(time.Now())["match"]; got != nil {
+		t.Fatalf("空房间新玩家的 state 不应包含旧 match，得到 %+v", got)
+	}
+}

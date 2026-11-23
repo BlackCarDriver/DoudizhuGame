@@ -28,6 +28,7 @@ export class OnlineClient {
     this.points = 0
     this.admin = false
     this.allowSpectatorHands = true
+    this.fullscreen = false
 
     this.snap = null
     this.match = null
@@ -130,6 +131,10 @@ export class OnlineClient {
     } else if (evt.type === 'init') {
       this.onChange()
     } else if (evt.type === 'roomstate') {
+      this.onChange()
+    } else if (evt.type === 'fullscreen') {
+      // 宿主进入/退出全屏后回传状态，用于游戏内按钮做下一次切换。
+      this.fullscreen = !!evt.value
       this.onChange()
     }
   }

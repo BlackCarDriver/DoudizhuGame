@@ -647,10 +647,29 @@ func (h *Hub) flushEvents() {
 // 连接管理
 // ============================================================
 
+func (h *Hub) clearFinishedMatchIfRoomEmptyLocked() {
+	if h.match == nil || h.match.Phase != "over" || len(h.clients) > 0 {
+		return
+	}
+	if h.match.Timer != nil {
+		h.match.Timer.Stop()
+		h.match.Timer = nil
+	}
+	matchID := h.match.ID
+	h.match = nil
+	for i := range h.seats {
+		h.seats[i] = SeatInfo{}
+		h.ready[i] = false
+		h.allowVotes[i] = false
+	}
+	log.Printf("[hub] 空房间清理已结束牌局 #%d", matchID)
+}
+
 func (h *Hub) addClient(c *client) {
 	h.rememberAvatar(c.avatar)
 	h.rememberAvatar(c.frame)
 	h.lock.Lock()
+	h.clearFinishedMatchIfRoomEmptyLocked()
 	old := h.clients[c.nick]
 	h.clients[c.nick] = c
 	if e, ok := h.grace[c.nick]; ok {
@@ -700,6 +719,7 @@ func (h *Hub) removeClient(nick string, c *client) {
 	delete(h.clients, nick)
 	seat := h.seatOfNickLocked(nick)
 	if seat < 0 {
+		h.clearFinishedMatchIfRoomEmptyLocked()
 		h.lock.Unlock()
 		log.Printf("[ws] %s 断开（%s）", nick, c.remote)
 		h.syncAll()
@@ -738,6 +758,7 @@ func (h *Hub) removeClient(nick string, c *client) {
 		}
 	}
 	h.startGraceLocked(nick, seat)
+	h.clearFinishedMatchIfRoomEmptyLocked()
 	h.lock.Unlock()
 	log.Printf("[ws] %s 断开（%s），座位进入托管/宽限", nick, c.remote)
 	h.syncAll()
@@ -833,6 +854,7 @@ func (h *Hub) OnUserLeaveRoom(nick string) {
 			h.allowVotes[seat] = false
 		}
 	}
+	h.clearFinishedMatchIfRoomEmptyLocked()
 	h.lock.Unlock()
 	if c != nil {
 		c.shutdown()
