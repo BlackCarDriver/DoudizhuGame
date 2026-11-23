@@ -1,6 +1,7 @@
 import {
   avatarHTML,
   cardBackHTML,
+  cardImage,
   cardHTML,
   escapeHTML,
   FARMER_FRAME,
@@ -8,6 +9,7 @@ import {
   sortCardsDesc,
   CARD_BACK,
 } from './cards.js'
+import { SFX, VOICE } from './audio.js'
 import { beats, parseCombo } from './rules.js'
 
 const SEATS = ['a', 'b', 'c']
@@ -58,6 +60,10 @@ export class UI {
     this.fxClass = ''
     this.lastTickSecond = -1
     this.lastBubbleCheck = 0
+    this.bgmMatchId = 0
+    this.timeTurnKey = ''
+    this.timeHalfPlayed = false
+    this.timeFivePlayed = false
     this.drag = null
     this.suppressCardClick = false
     this.bottomAnim = null
@@ -117,6 +123,11 @@ export class UI {
         <div class="rotate-tip">请横屏使用</div>
       </div>
       </div>
+      <div class="loading-screen" id="loading-screen">
+        <div class="loading-title">斗地主</div>
+        <div class="loading-bar"><div class="loading-fill" id="loading-fill"></div></div>
+        <div class="loading-text" id="loading-text">资源加载 0%</div>
+      </div>
     `
     this.modalHTML = ''
     this.modalToken = ''
@@ -154,6 +165,67 @@ export class UI {
       this.renderChatNew()
     }, { passive: true })
     window.addEventListener('keydown', this._onKey)
+  }
+
+  preloadImage(url) {
+    return new Promise((resolve) => {
+      const img = new Image()
+      let finished = false
+      let timer = null
+      const finish = () => {
+        if (finished) return
+        finished = true
+        if (timer) clearTimeout(timer)
+        img.onload = null
+        img.onerror = null
+        resolve()
+      }
+      img.onload = finish
+      img.onerror = finish
+      img.decoding = 'async'
+      timer = setTimeout(finish, 8000)
+      img.src = url
+    })
+  }
+
+  async preloadAssets() {
+    if (this._preloadPromise) return this._preloadPromise
+    const screen = this.app.querySelector('#loading-screen')
+    const fill = this.app.querySelector('#loading-fill')
+    const label = this.app.querySelector('#loading-text')
+    if (!screen || !fill || !label) return
+    const urls = new Set()
+    for (let id = 0; id < 54; id++) urls.add(cardImage(id))
+    urls.add(CARD_BACK)
+    urls.add(LANDLORD_FRAME)
+    urls.add(FARMER_FRAME)
+    for (const url of Object.values(SFX)) urls.add(url)
+    const all = [...urls]
+    const audioUrls = new Set(Object.values(SFX))
+    let done = 0
+    const update = () => {
+      const pct = all.length ? Math.round((done / all.length) * 100) : 100
+      fill.style.width = `${pct}%`
+      label.textContent = `资源加载 ${pct}%`
+    }
+    update()
+    this._preloadPromise = Promise.all(
+      all.map((url) => {
+        const task = audioUrls.has(url) ? this.audio.preload(url) : this.preloadImage(url)
+        return task.then(() => {
+          done += 1
+          update()
+        })
+      }),
+    ).then(() => {
+      fill.style.width = '100%'
+      label.textContent = '资源加载 100%'
+      setTimeout(() => {
+        screen.classList.add('hide')
+        setTimeout(() => { screen.style.display = 'none' }, 300)
+      }, 180)
+    })
+    return this._preloadPromise
   }
 
   // 竖屏 iframe 内使用虚拟横屏坐标系：整个游戏层旋转 90 度。
@@ -272,6 +344,12 @@ export class UI {
       case 'nodouble':
         this.online.double(false)
         break
+      case 'reveal': {
+        const seat = this.online.mySeat()
+        const revealed = !!this.online.match?.doubling?.revealed?.[seatIndex(seat)]
+        this.online.reveal(!revealed)
+        break
+      }
       case 'hint':
         this.requestOrCycleHint()
         break
@@ -338,8 +416,14 @@ export class UI {
     else this.online.requestHint()
   }
 
+  canSelectCards() {
+    const hand = this.online.hand
+    const mySeat = this.online.mySeat()
+    return !!mySeat && hand.seat === mySeat && this.online.phase() === 'playing' && !!hand.cards?.length
+  }
+
   _toggleCard(id) {
-    if (!this.online.canPlay()) return
+    if (!this.canSelectCards()) return
     if (this.selected.has(id)) this.selected.delete(id)
     else this.selected.add(id)
     this.audio.play('click')
@@ -361,10 +445,89 @@ export class UI {
     if (!this.online.canPlay()) return
     const sel = this.selectionState()
     if (!sel.ok) return
+    this.animatePlayToTable(sel.cards)
     this.online.play(sel.cards)
     this.selected.clear()
     this.renderHand()
     this.renderActions()
+  }
+
+  playTargetRect(cardWidth, cardHeight) {
+    const existing = this.app.querySelector('.table-action.self')
+    if (existing) return existing.getBoundingClientRect()
+    const actions = this.app.querySelector('#table-actions')
+    if (!actions) return null
+    const ghost = document.createElement('div')
+    ghost.className = 'table-action self play-target-ghost'
+    ghost.style.width = `${Math.max(24, cardWidth)}px`
+    ghost.style.height = `${Math.max(32, cardHeight)}px`
+    ghost.style.visibility = 'hidden'
+    actions.appendChild(ghost)
+    const rect = ghost.getBoundingClientRect()
+    ghost.remove()
+    return rect
+  }
+
+  animatePlayToTable(cards) {
+    const hand = this.app.querySelector('#hand')
+    if (!hand || !cards.length) return
+    const byId = new Map(
+      [...hand.querySelectorAll('.hand-cards .card[data-card]')].map((el) => [Number(el.dataset.card), el]),
+    )
+    const sources = cards.map((c) => byId.get(c.id)).filter(Boolean)
+    if (!sources.length) return
+    const firstRect = sources[0].getBoundingClientRect()
+    const targetRect = this.playTargetRect(firstRect.width, firstRect.height)
+    if (!targetRect) return
+    const layer = document.createElement('div')
+    layer.className = 'play-fly-layer'
+    this.app.appendChild(layer)
+    const portrait = this.app.classList.contains('portrait-rotated')
+    const tx = targetRect.left + targetRect.width / 2
+    const ty = targetRect.top + targetRect.height / 2
+    sources.forEach((el, i) => {
+      const r = el.getBoundingClientRect()
+      const outer = document.createElement('div')
+      outer.className = 'play-fly'
+      outer.style.left = `${r.left}px`
+      outer.style.top = `${r.top}px`
+      outer.style.width = `${r.width}px`
+      outer.style.height = `${r.height}px`
+      const inner = document.createElement('div')
+      inner.className = 'play-fly-rotate'
+      if (portrait) {
+        inner.style.width = `${r.height}px`
+        inner.style.height = `${r.width}px`
+        inner.style.left = `${(r.width - r.height) / 2}px`
+        inner.style.top = `${(r.height - r.width) / 2}px`
+        inner.style.transform = 'rotate(90deg)'
+      } else {
+        inner.style.width = '100%'
+        inner.style.height = '100%'
+      }
+      const clone = el.cloneNode(true)
+      clone.classList.remove('selected')
+      clone.classList.add('play-fly-card')
+      inner.appendChild(clone)
+      outer.appendChild(inner)
+      layer.appendChild(outer)
+      const dx = tx - (r.left + r.width / 2)
+      const dy = ty - (r.top + r.height / 2)
+      const targetWidth = Math.min(targetRect.width, r.width)
+      const scale = Math.max(0.55, Math.min(1, targetWidth / r.width))
+      try {
+        outer.animate(
+          [
+            { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+            { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.15 },
+          ],
+          { duration: 280, delay: i * 18, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' },
+        )
+      } catch {
+        /* ignore */
+      }
+    })
+    setTimeout(() => layer.remove(), 380 + sources.length * 18)
   }
 
   _handCards() {
@@ -373,7 +536,7 @@ export class UI {
 
   _onHandPointerDown(e) {
     if (this.drag) return
-    if (!this.online.canPlay()) return
+    if (!this.canSelectCards()) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
     const card = e.target.closest?.('[data-card]')
     if (!card) return
@@ -466,6 +629,10 @@ export class UI {
   // ============================================================
 
   event(type, data) {
+    if (type === 'sfx') {
+      this.playSfxEvent(data)
+      return
+    }
     switch (type) {
       case 'match':
         this.selected.clear()
@@ -481,6 +648,10 @@ export class UI {
         this.cancelDealReveal()
         this.dealRevealPending = true
         this.audio.play('deal')
+        if (data.match?.id && data.match.id !== this.bgmMatchId) {
+          this.bgmMatchId = data.match.id
+          this.audio.playBgm(SFX.bgmStart, 0.3)
+        }
         break
       case 'play-start':
         this.cancelDealReveal()
@@ -488,11 +659,11 @@ export class UI {
         this.renderHand()
         break
       case 'play':
-        this.audio.play('play')
+        this.playComboVoice(data?.play, data?.beat)
         this.flash('played', 420)
         break
       case 'bomb':
-        this.audio.play('bomb')
+        this.playComboVoice(data?.play, data?.beat)
         this.flash('shake', 520)
         break
       case 'turn':
@@ -510,6 +681,60 @@ export class UI {
       }
     }
     this.render()
+  }
+
+  playSfxEvent(evt) {
+    if (!evt) return
+    switch (evt.kind) {
+      case 'bid': {
+        let key = 'call'
+        if (evt.action === 'call') key = 'call'
+        else if (evt.action === 'rob') key = evt.seat === evt.caller ? 'woqian' : 'rob'
+        else key = evt.stage === 'call' ? 'noCall' : 'noRob'
+        this.audio.playFile(SFX[key], 0.85)
+        break
+      }
+      case 'double':
+        this.audio.playFile(evt.action === 'double' ? SFX.double : SFX.noDouble, 0.85)
+        break
+      case 'reveal':
+        this.audio.playFile(SFX.minpai, 0.85)
+        break
+      case 'pass':
+        this.audio.playFile(Math.random() < 0.5 ? SFX.pass1 : SFX.pass2, 0.8)
+        break
+      case 'one-card':
+        this.audio.playFile(SFX.yizhanpai, 0.85)
+        break
+    }
+  }
+
+  playComboVoice(play, beat = false) {
+    const combo = play?.combo
+    let file = ''
+    if (combo?.type === 'single') file = VOICE.single[combo.main] || ''
+    else if (combo?.type === 'pair') file = VOICE.pair[combo.main] || ''
+    else if (combo) file = VOICE.combo[combo.type] || ''
+    const hasSpecific = !!file
+    if (!file) file = SFX.chupai
+    let usedTaunt = false
+    if (beat) {
+      const chance = hasSpecific ? 0.1 : 1 / 3
+      if (Math.random() < chance) {
+        const taunts = [SFX.taunt1, SFX.taunt2, SFX.taunt3]
+        file = taunts[Math.floor(Math.random() * taunts.length)]
+        usedTaunt = true
+      }
+    }
+    this.audio.playFile(file, 0.85)
+    if (combo?.type === 'bomb' || combo?.type === 'rocket') {
+      this.audio.playBgm(SFX.bgmBomb, 0.32)
+    }
+    if (!usedTaunt && combo?.type === 'straight') {
+      setTimeout(() => this.audio.playFile(SFX.lianduibg, 0.7), 700)
+    } else if (!usedTaunt && /^airplane/.test(combo?.type || '')) {
+      setTimeout(() => this.audio.playFile(SFX.feiji, 0.7), 700)
+    }
   }
 
   startBottomDeal(match) {
@@ -743,7 +968,21 @@ export class UI {
     if (el._seatHTML === html && el._seatToken === token) return
     el._seatHTML = html
     el._seatToken = token
+
+    // 座位状态（轮到谁、剩余牌数、积分）变化时只更新文本，
+    // 头像/头像框如果 URL 没变，保留原 DOM 节点，避免图片被销毁后重新加载。
+    const keyOf = (wrap) => {
+      if (!wrap) return ''
+      const srcs = [...wrap.querySelectorAll('img')].map((img) => img.getAttribute('src') || '')
+      return `${wrap.className}|${srcs.join('|')}`
+    }
+    const oldWrap = el.querySelector('.avatar-wrap')
+    const oldKey = keyOf(oldWrap)
     el.innerHTML = html
+    const newWrap = el.querySelector('.avatar-wrap')
+    if (oldWrap && newWrap && oldKey === keyOf(newWrap)) {
+      newWrap.replaceWith(oldWrap)
+    }
   }
 
   seatCard(seat, pos) {
@@ -779,6 +1018,11 @@ export class UI {
         ? `<div class="opponent-backs" aria-hidden="true">${Array.from({ length: Math.min(shownCardsLeft, 20) }, (_, i) => cardBackHTML({ small: true, style: `--i:${i}` })).join('')}</div>`
         : ''
     const audience = this.audienceHTML(seat)
+    const revealedCards = Array.isArray(info.revealedCards) ? info.revealedCards : []
+    const showRevealed = !!info.revealed && seat !== this.online.mySeat() && revealedCards.length > 0
+    const revealedHTML = showRevealed
+      ? `<div class="revealed-hand">${sortCardsDesc(revealedCards).map((c) => cardHTML(c, { small: true, disabled: true })).join('')}</div>`
+      : ''
     return `<div class="${classes}" data-seat="${seat}" ${watch}>
       ${clock}
       <div class="seat-main">
@@ -794,7 +1038,7 @@ export class UI {
       </div>
       ${backs}
       ${audience}
-    </div>`
+    </div>${revealedHTML}`
   }
 
   bidText(info, m) {
@@ -816,7 +1060,7 @@ export class UI {
       if (!/^https?:\/\//i.test(b.url || '')) return ''
       return `<div class="bubble emotion" data-at="${b.at || ''}"><img src="${escapeHTML(b.url)}" alt="${escapeHTML(b.text)}" style="width:${escapeHTML(w)};height:${escapeHTML(h)}" /></div>`
     }
-    return `<div class="bubble text" data-at="${b.at || ''}">${escapeHTML(b.text)}</div>`
+    return `<div class="bubble text" data-at="${b.at || ''}"><span class="bubble-text">${escapeHTML(b.text)}</span></div>`
   }
 
   clockHTML() {
@@ -1072,6 +1316,10 @@ export class UI {
       } else {
         parts.push(`<span class="waiting">等待其他玩家加倍…</span>`)
       }
+      if (mySeat) {
+        const revealed = !!m.doubling?.revealed?.[seatIndex(mySeat)]
+        parts.push(`<button class="btn tiny ${revealed ? 'primary' : 'ghost'}" data-act="reveal">${revealed ? '取消明牌' : '明牌 ×2'}</button>`)
+      }
     } else if (m && m.phase === 'playing') {
       if (this.online.canPlay()) {
         const sel = this.selectionState()
@@ -1146,15 +1394,11 @@ export class UI {
     this.chatKey = key
     list.innerHTML = chats
       .map((c) => {
-        const av = avatarHTML(
-          { nick: c.nick, avatar: c.avatar, frame: c.frame },
-          { token, size: 'tiny', showFrame: false },
-        )
         const body =
           c.kind === 'emotion' && /^https?:\/\//i.test(c.url || '')
             ? `<img class="chat-emotion" src="${escapeHTML(c.url)}" alt="" />`
             : `<span class="chat-text">${escapeHTML(c.text)}</span>`
-        return `<div class="chat-row"><span class="chat-avatar">${av}</span><div class="chat-body"><span class="chat-nick">${escapeHTML(c.nick)}</span>${body}</div></div>`
+        return `<div class="chat-row"><div class="chat-body"><span class="chat-nick">${escapeHTML(c.nick)}：</span>${body}</div></div>`
       })
       .join('')
     if (wasBottom) {
@@ -1211,9 +1455,10 @@ export class UI {
     const rows = (r.players || [])
       .map(
         (p) => `<div class="result-row ${p.seat === mySeat ? 'me' : ''}">
-          <span class="rr-name"><span class="rr-nick">${escapeHTML(p.nick)}</span><span class="rr-role ${p.role}">${roleText(p.role)}</span>${p.double ? '<small>加倍</small>' : ''}${p.dailyBonus ? `<small>活跃+${p.dailyBonus}</small>` : ''}</span>
+          <span class="rr-name"><span class="rr-nick">${escapeHTML(p.nick)}</span><span class="rr-role ${p.role}">${roleText(p.role)}</span>${p.double ? '<small>加倍</small>' : ''}${p.tableFee ? `<small>桌费-${p.tableFee}</small>` : ''}${p.dailyBonus ? `<small>活跃+${p.dailyBonus}</small>` : ''}</span>
           <span class="rr-delta ${p.delta >= 0 ? 'up' : 'down'}">${fmtDelta(p.delta)}</span>
           <span class="rr-points">${p.points} 分</span>
+          ${Array.isArray(p.remain) ? `<div class="rr-remain"><span class="rr-remain-label">剩牌</span>${p.remain.length ? sortCardsDesc(p.remain).map((c) => cardHTML(c, { small: true, disabled: true })).join('') : '<span class="rr-remain-empty">已出完</span>'}</div>` : ''}
         </div>`,
       )
       .join('')
@@ -1226,6 +1471,7 @@ export class UI {
         <div class="mult-breakdown">
           <span>底分 ${r.base}</span><span>抢地主 x${r.robMultiplier}</span><span>炸弹 ${r.bombCount}</span>
           ${r.rake ? `<span>抽水 -${r.rake}</span>` : ''}
+          ${r.tableFee ? `<span>桌费 -${r.tableFee}</span>` : ''}
           ${r.spring ? '<span class="hot">春天 x2</span>' : ''}${r.antiSpring ? '<span class="hot">反春 x2</span>' : ''}
         </div>
         <div class="result-rows">${rows}</div>
@@ -1306,11 +1552,24 @@ export class UI {
     }
     const cd = this.app.querySelector('[data-countdown]')
     if (cd) cd.textContent = Math.max(0, Math.ceil(this.online.countdownSeconds() || this.online.remainingSeconds()))
-    if (this.online.canPlay() && sec <= 5 && sec > 0 && sec !== this.lastTickSecond) {
-      this.lastTickSecond = sec
-      this.audio.play('tick')
+    const turnKey = `${this.online.match?.id || 0}:${this.online.match?.turn || ''}`
+    if (turnKey !== this.timeTurnKey) {
+      this.timeTurnKey = turnKey
+      this.timeHalfPlayed = false
+      this.timeFivePlayed = false
     }
-    if (sec > 5) this.lastTickSecond = -1
+    if (this.online.phase() === 'playing' && this.online.canPlay()) {
+      const total = Number(this.online.snap?.settings?.turnSeconds) || 30
+      const half = Math.ceil(total / 2)
+      if (sec === half && !this.timeHalfPlayed) {
+        this.timeHalfPlayed = true
+        this.audio.playFile(SFX.time2, 0.8)
+      }
+      if (sec === 5 && !this.timeFivePlayed) {
+        this.timeFivePlayed = true
+        this.audio.playFile(SFX.time, 0.8)
+      }
+    }
 
     const now = Date.now()
     if (now - this.lastBubbleCheck > 900) {

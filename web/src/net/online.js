@@ -52,6 +52,8 @@ export class OnlineClient {
     this.lastPlayKey = ''
     this.lastResultKey = ''
     this.resultDismissed = false
+    // 首次进入连接时，不自动弹出已经结束的旧牌局结果。
+    this.initialState = true
 
     this.socket = new GameSocket({
       onOpen: () => this._onOpen(),
@@ -190,6 +192,7 @@ export class OnlineClient {
 
   _applyState(msg) {
     this.clockOffset = (msg.serverNow || Date.now()) - Date.now()
+    const oldSnap = this.snap
     const oldMatch = this.match
     const oldPhase = oldMatch?.phase || ''
     this.snap = msg
@@ -212,11 +215,14 @@ export class OnlineClient {
       this.lastTurnKey = ''
       this.lastPlayKey = ''
       this.lastResultKey = ''
+      this.initialState = false
       this.onChange()
       return
     }
 
     const m = this.match
+    const initialOver = this.initialState && m.phase === 'over' && !!m.result
+    this.initialState = false
     if (m.id !== this.lastMatchId) {
       this.lastMatchId = m.id
       this.lastPhase = ''
@@ -228,6 +234,13 @@ export class OnlineClient {
       this.hintIndex = -1
       this.onEvent('match', { match: m })
     }
+    // 这次连接是首次进入，且牌局已经结束：默认收起结果弹窗，
+    // 但保留“查看结果”按钮，避免新进入/重进的人被旧结算打断。
+    if (initialOver) {
+      this.resultDismissed = true
+      this.lastResultKey = `${m.id}:${m.result.winnerSide}:${m.result.publicMultiplier}`
+    }
+    this._emitActionSfx(oldSnap, oldMatch, msg)
     if (m.phase !== this.lastPhase) {
       this.lastPhase = m.phase
       this.clearHint()
@@ -245,7 +258,7 @@ export class OnlineClient {
     if (playKey && playKey !== this.lastPlayKey) {
       this.lastPlayKey = playKey
       const isBomb = m.lastPlay.combo?.type === 'bomb' || m.lastPlay.combo?.type === 'rocket'
-      this.onEvent(isBomb ? 'bomb' : 'play', { play: m.lastPlay })
+      this.onEvent(isBomb ? 'bomb' : 'play', { play: m.lastPlay, beat: !!oldMatch?.lastPlay })
     }
     if (m.result) {
       const rk = `${m.id}:${m.result.winnerSide}:${m.result.publicMultiplier}`
@@ -256,6 +269,40 @@ export class OnlineClient {
     }
     if (msg.closed) this.setError('房间已关闭')
     this.onChange()
+  }
+
+  _emitActionSfx(oldSnap, oldMatch, msg) {
+    const m = msg.match
+    if (!oldMatch || !m || oldMatch.id !== m.id) return
+    const oldSeats = oldSnap?.seats || {}
+    const newSeats = msg.seats || {}
+    for (const seat of ['a', 'b', 'c']) {
+      const os = oldSeats[seat] || {}
+      const ns = newSeats[seat] || {}
+      if (ns.bid && ns.bid !== os.bid) {
+        this.onEvent('sfx', {
+          kind: 'bid',
+          action: ns.bid,
+          stage: m.bidding?.stage || oldMatch.bidding?.stage || 'call',
+          caller: m.bidding?.caller || oldMatch.bidding?.caller || '',
+          seat,
+        })
+      }
+      if (ns.double && ns.double !== os.double) {
+        this.onEvent('sfx', { kind: 'double', action: ns.double })
+      }
+      if (ns.lastAction?.pass && !os.lastAction?.pass) {
+        this.onEvent('sfx', { kind: 'pass' })
+      }
+      if (Number(ns.cardsLeft) === 1 && Number(os.cardsLeft) > 1) {
+        this.onEvent('sfx', { kind: 'one-card' })
+      }
+    }
+    const oldRevealed = oldMatch.doubling?.revealed || []
+    const newRevealed = m.doubling?.revealed || []
+    for (let i = 0; i < 3; i++) {
+      if (newRevealed[i] && !oldRevealed[i]) this.onEvent('sfx', { kind: 'reveal' })
+    }
   }
 
   _applyHand(msg) {
@@ -481,6 +528,10 @@ export class OnlineClient {
 
   double(value) {
     this.socket.send({ type: 'double', value: !!value })
+  }
+
+  reveal(value) {
+    this.socket.send({ type: 'reveal', value: !!value })
   }
 
   play(cards) {

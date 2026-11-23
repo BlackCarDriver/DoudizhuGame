@@ -5,12 +5,6 @@
   <g transform="translate(8 0) scale(0.86 1)">
     <text x="0" y="72" font-family="Arial, Helvetica, sans-serif" font-size="78" font-weight="800" fill="#1b1b1f">2</text>
   </g>
-  <text x="8" y="126" font-family="Georgia, serif" font-size="52" fill="#1b1b1f">♣</text>
-  <text x="84" y="150" text-anchor="middle" font-family="Georgia, serif" font-size="90" fill="#1b1b1f" opacity=".92">♣</text>
-  <g transform="rotate(180 80 112)">
-    <g transform="translate(8 0) scale(0.86 1)">
-      <text x="0" y="72" font-family="Arial, Helvetica, sans-serif" font-size="78" font-weight="800" fill="#1b1b1f">2</text>
-    </g>
-    <text x="8" y="126" font-family="Georgia, serif" font-size="52" fill="#1b1b1f">♣</text>
-  </g>
+  <text x="26.64824" y="126" text-anchor="middle" font-family="Georgia, serif" font-size="52" fill="#1b1b1f" stroke="#1b1b1f" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">♣</text>
+  <text x="98" y="190" text-anchor="middle" font-family="Georgia, serif" font-size="135" fill="#1b1b1f" opacity=".92" stroke="#1b1b1f" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round">♣</text>
 </svg>

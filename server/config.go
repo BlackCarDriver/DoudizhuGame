@@ -34,6 +34,7 @@ type fileConfig struct {
 	RakePercent        *int     `json:"rakePercent"`
 	RakeMinProfit      *int     `json:"rakeMinProfit"`
 	RakeCap            *int     `json:"rakeCap"`
+	TableFee           *int     `json:"tableFee"`
 	BaseScore          int      `json:"baseScore"`
 	DataDir            string   `json:"dataDir"`
 	BoardLimit         int      `json:"boardLimit"`
@@ -45,7 +46,7 @@ func (f fileConfig) isZero() bool {
 		f.CountdownSeconds == 0 && f.BidSeconds == 0 && f.DoubleSeconds == 0 && f.TurnSeconds == 0 &&
 		f.SeatGraceSeconds == 0 && f.AllowSpectatorHand == nil && f.InitialPoints == nil &&
 		f.MinPointsToSit == nil && f.DailyActiveReward == nil && f.RakePercent == nil &&
-		f.RakeMinProfit == nil && f.RakeCap == nil && f.BaseScore == 0 && f.DataDir == "" && f.BoardLimit == 0 &&
+		f.RakeMinProfit == nil && f.RakeCap == nil && f.TableFee == nil && f.BaseScore == 0 && f.DataDir == "" && f.BoardLimit == 0 &&
 		len(f.AdminNicks) == 0
 }
 
@@ -76,6 +77,7 @@ type Config struct {
 	RakePercent         int
 	RakeMinProfit       int
 	RakeCap             int
+	TableFee            int
 	BaseScore           int
 	DataDir             string
 	BoardLimit          int

@@ -74,7 +74,9 @@
       "bid": "call",
       "double": "double",
       "lastAction": { "seat": 0, "pass": false, "cards": [], "combo": { "type": "single", "main": 3, "len": 1 } },
-      "turn": true
+      "turn": true,
+      "revealed": false,
+      "revealedCards": []
     },
     "b": null,
     "c": null
@@ -95,7 +97,11 @@
     "lastPlay": null,
     "passCount": 0,
     "bidding": { "stage": "call", "turn": "a", "caller": "" },
-    "doubling": null,
+    "doubling": {
+      "actions": ["", "", ""],
+      "done": [false, false, false],
+      "revealed": [false, false, false]
+    },
     "result": null,
     "serverNow": 1794000000000
   },
@@ -109,7 +115,7 @@
     "baseScore": 1,
     "countdownSeconds": 3,
     "bidSeconds": 15,
-    "doubleSeconds": 5,
+    "doubleSeconds": 10,
     "turnSeconds": 30
   }
 }

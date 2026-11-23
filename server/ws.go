@@ -335,6 +335,10 @@ func (s *Handler) handleMessage(c *client, data []byte) {
 		if errText := s.hub.double(c.nick, msg.Value); errText != "" {
 			s.sendErr(c, errText)
 		}
+	case "reveal":
+		if errText := s.hub.reveal(c.nick, msg.Value); errText != "" {
+			s.sendErr(c, errText)
+		}
 	case "vote_spectator":
 		if errText := s.hub.voteSpectator(c.nick, msg.Allow); errText != "" {
 			s.sendErr(c, errText)

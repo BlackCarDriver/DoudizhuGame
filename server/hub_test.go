@@ -237,10 +237,16 @@ func TestDoubleAndSettleWithSpring(t *testing.T) {
 	}
 	for i, p := range r.Players {
 		if i == landlord {
+			if len(p.Remain) != 0 {
+				t.Fatalf("地主已出完，剩余手牌应为空，得到 %+v", p.Remain)
+			}
 			continue
 		}
 		if p.Delta != -64 {
 			t.Fatalf("农民应 -64，得到 %+v", p)
+		}
+		if len(p.Remain) != 17 {
+			t.Fatalf("农民剩余手牌应为 17，得到 %d", len(p.Remain))
 		}
 	}
 }
@@ -878,5 +884,148 @@ func TestFinishedMatchClearedWhenRoomEmpty(t *testing.T) {
 	}
 	if got := h.snapshotLocked(time.Now())["match"]; got != nil {
 		t.Fatalf("空房间新玩家的 state 不应包含旧 match，得到 %+v", got)
+	}
+}
+
+func TestSitClearsFinishedMatch(t *testing.T) {
+	h := newTestHub(t)
+	h.lock.Lock()
+	h.match = &Match{
+		ID:     77,
+		Phase:  "over",
+		Result: &ResultInfo{WinnerSide: "landlord", Landlord: "a"},
+		Hands:  [3][]rules.Card{{rules.CardByID(0)}, {rules.CardByID(1)}, {rules.CardByID(2)}},
+	}
+	h.lock.Unlock()
+	if err := h.sitAt("alice", "a"); err != "" {
+		t.Fatalf("sit: %s", err)
+	}
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	if h.match != nil {
+		t.Fatalf("上坐后应清理上一局，得到 %+v", h.match)
+	}
+}
+
+func TestBaseScoreTwoAndTableFee(t *testing.T) {
+	h := newTestHub(t)
+	h.cfg.BaseScore = 2
+	h.cfg.TableFee = 1
+	startGame(t, h)
+	bidFirstCallThenAllRob(t, h)
+	for _, nick := range []string{"alice", "bob", "carol"} {
+		if err := h.double(nick, false); err != "" {
+			t.Fatalf("no double %s: %s", nick, err)
+		}
+	}
+
+	h.lock.Lock()
+	landlord := h.match.Landlord
+	landlordNick := h.seats[landlord].Nick
+	card := h.match.Hands[landlord][0]
+	h.match.Hands[landlord] = []rules.Card{card}
+	h.lock.Unlock()
+	if err := h.play(landlordNick, []int{card.ID}); err != "" {
+		t.Fatalf("play: %s", err)
+	}
+
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	r := h.match.Result
+	if r == nil {
+		t.Fatal("缺少结果")
+	}
+	if r.Base != 2 || r.TableFee != 3 {
+		t.Fatalf("底分/桌费错误：base=%d tableFee=%d", r.Base, r.TableFee)
+	}
+	var landlordResult PlayerResult
+	for _, p := range r.Players {
+		if p.Seat == seatAt(landlord) {
+			landlordResult = p
+		} else if p.Delta != -33 {
+			t.Fatalf("农民扣桌费后应 -33，得到 %+v", p)
+		}
+	}
+	if landlordResult.Delta != 63 || landlordResult.Points != 163 {
+		t.Fatalf("地主扣桌费后应 +63/163，得到 %+v", landlordResult)
+	}
+}
+
+func TestReconnectFollowingSingleRejectsPair(t *testing.T) {
+	h := newTestHub(t)
+	startGame(t, h)
+	bidFirstCallThenAllRob(t, h)
+	doubleAll(t, h)
+
+	h.lock.Lock()
+	alice := h.seats[h.seatOfNickLocked("alice")]
+	h.match.Phase = "playing"
+	h.match.Turn = h.seatOfNickLocked("alice")
+	h.match.LastPlayer = h.seatOfNickLocked("bob")
+	h.match.LastPlay = &PlayInfo{
+		Seat:  h.seatOfNickLocked("bob"),
+		Cards: []rules.Card{rules.CardByID(0)},
+		Combo: rules.Combo{Type: rules.Single, Main: 3, Len: 1},
+	}
+	h.match.Hands[h.match.Turn] = []rules.Card{rules.CardByID(4), rules.CardByID(5)}
+	aliceNick := alice.Nick
+	h.lock.Unlock()
+
+	// 模拟掉线后重新连接，LastPlay 仍是上一家的单张。
+	h.lock.Lock()
+	c := h.clients[aliceNick]
+	h.lock.Unlock()
+	if c != nil {
+		h.removeClient(aliceNick, c)
+	}
+	h.addClient(fakeClient(aliceNick))
+
+	if err := h.play(aliceNick, []int{4, 5}); err == "" {
+		t.Fatal("上一手是单张时，重连后普通对子不应被允许")
+	} else if err != "压不过上一手" {
+		t.Fatalf("错误提示不对：%s", err)
+	}
+}
+
+func TestRevealDoublesMultiplierAndSharesCards(t *testing.T) {
+	h := newTestHub(t)
+	startGame(t, h)
+	bidFirstCallThenAllRob(t, h) // 停在 doubling
+	h.lock.Lock()
+	seat := h.seatOfNickLocked("alice")
+	before := h.match.RobMultiplier
+	h.lock.Unlock()
+
+	if err := h.reveal("alice", true); err != "" {
+		t.Fatalf("reveal: %s", err)
+	}
+	h.lock.Lock()
+	if !h.match.Reveal[seat] {
+		h.lock.Unlock()
+		t.Fatal("明牌状态未记录")
+	}
+	view := h.matchViewLocked(time.Now())
+	seatView := h.seatViewLocked(seat).(map[string]interface{})
+	h.lock.Unlock()
+	if view["publicMultiplier"] != before*2 {
+		t.Fatalf("明牌后公共倍数应为 %d，得到 %v", before*2, view["publicMultiplier"])
+	}
+	if seatView["revealed"] != true {
+		t.Fatal("明牌玩家应标记 revealed")
+	}
+	if len(seatView["revealedCards"].([]rules.Card)) == 0 {
+		t.Fatal("明牌玩家应公开手牌")
+	}
+
+	if err := h.reveal("alice", false); err != "" {
+		t.Fatalf("cancel reveal: %s", err)
+	}
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	if h.match.Reveal[seat] {
+		t.Fatal("取消明牌后状态应清除")
+	}
+	if got := h.matchViewLocked(time.Now())["publicMultiplier"]; got != before {
+		t.Fatalf("取消明牌后倍数应恢复 %d，得到 %v", before, got)
 	}
 }

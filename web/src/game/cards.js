@@ -6,7 +6,7 @@ export const LANDLORD_FRAME = 'https://nichijou.cn/source/frame/2.webp'
 export const FARMER_FRAME = 'https://nichijou.cn/source/frame/15.webp'
 
 export function cardImage(id) {
-  return withBase(`/cards/c${id}.svg?v=9`)
+  return withBase(`/cards/c${id}.svg?v=13`)
 }
 
 export function escapeHTML(s) {

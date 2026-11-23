@@ -416,8 +416,9 @@ func (h *Hub) matchViewLocked(now time.Time) map[string]interface{} {
 	var doubling interface{}
 	if m.Phase == "doubling" || m.Phase == "playing" || m.Phase == "over" {
 		doubling = map[string]interface{}{
-			"actions": m.DoubleActions,
-			"done":    m.DoubleDone,
+			"actions":  m.DoubleActions,
+			"done":     m.DoubleDone,
+			"revealed": m.Reveal,
 		}
 	}
 	var result interface{}
@@ -425,6 +426,11 @@ func (h *Hub) matchViewLocked(now time.Time) map[string]interface{} {
 		result = m.Result
 	}
 	multiplier := m.RobMultiplier
+	for _, revealed := range m.Reveal {
+		if revealed {
+			multiplier *= 2
+		}
+	}
 	for i := 0; i < m.BombCount; i++ {
 		multiplier *= 2
 	}
@@ -471,6 +477,8 @@ func (h *Hub) seatViewLocked(i int) interface{} {
 	double := ""
 	lastAction := interface{}(nil)
 	turn := false
+	revealed := false
+	var revealedCards []rules.Card
 	if h.match != nil {
 		if h.match.Landlord == i {
 			role = "landlord"
@@ -486,23 +494,29 @@ func (h *Hub) seatViewLocked(i int) interface{} {
 			lastAction = h.match.LastActions[i]
 		}
 		turn = h.match.Turn == i && h.match.Phase != "over"
+		revealed = h.match.Reveal[i] && h.match.Phase != "over"
+		if revealed {
+			revealedCards = append([]rules.Card{}, h.match.Hands[i]...)
+		}
 	}
 	return map[string]interface{}{
-		"seat":       seatAt(i),
-		"nick":       s.Nick,
-		"avatar":     s.Avatar,
-		"frame":      s.Frame,
-		"roleId":     s.RoleID,
-		"points":     s.Points,
-		"ready":      h.ready[i],
-		"connected":  s.Connected,
-		"auto":       s.Auto,
-		"role":       role,
-		"cardsLeft":  cardsLeft,
-		"bid":        bid,
-		"double":     double,
-		"lastAction": lastAction,
-		"turn":       turn,
+		"seat":          seatAt(i),
+		"nick":          s.Nick,
+		"avatar":        s.Avatar,
+		"frame":         s.Frame,
+		"roleId":        s.RoleID,
+		"points":        s.Points,
+		"ready":         h.ready[i],
+		"connected":     s.Connected,
+		"auto":          s.Auto,
+		"role":          role,
+		"cardsLeft":     cardsLeft,
+		"bid":           bid,
+		"double":        double,
+		"lastAction":    lastAction,
+		"turn":          turn,
+		"revealed":      revealed,
+		"revealedCards": revealedCards,
 	}
 }
 
@@ -647,8 +661,8 @@ func (h *Hub) flushEvents() {
 // 连接管理
 // ============================================================
 
-func (h *Hub) clearFinishedMatchIfRoomEmptyLocked() {
-	if h.match == nil || h.match.Phase != "over" || len(h.clients) > 0 {
+func (h *Hub) clearFinishedMatchLocked() {
+	if h.match == nil || h.match.Phase != "over" {
 		return
 	}
 	if h.match.Timer != nil {
@@ -657,12 +671,19 @@ func (h *Hub) clearFinishedMatchIfRoomEmptyLocked() {
 	}
 	matchID := h.match.ID
 	h.match = nil
+	log.Printf("[hub] 清理已结束牌局 #%d", matchID)
+}
+
+func (h *Hub) clearFinishedMatchIfRoomEmptyLocked() {
+	if h.match == nil || h.match.Phase != "over" || len(h.clients) > 0 {
+		return
+	}
+	h.clearFinishedMatchLocked()
 	for i := range h.seats {
 		h.seats[i] = SeatInfo{}
 		h.ready[i] = false
 		h.allowVotes[i] = false
 	}
-	log.Printf("[hub] 空房间清理已结束牌局 #%d", matchID)
 }
 
 func (h *Hub) addClient(c *client) {

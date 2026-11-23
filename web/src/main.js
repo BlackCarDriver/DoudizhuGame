@@ -22,6 +22,7 @@ const online = new OnlineClient({
 ui = new UI(app, online, { shell, audio })
 ui.mount()
 online.start()
+ui.preloadAssets()
 
 // 本地调试钩子：只在 localhost 暴露，方便用 DevTools/CDP 检查牌局状态。
 if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {

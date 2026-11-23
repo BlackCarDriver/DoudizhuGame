@@ -16,6 +16,7 @@ type ScoreInput struct {
 	RakePercent   int
 	RakeMinProfit int
 	RakeCap       int
+	RevealCount   int // 明牌人数；明牌会让公共倍数再 ×2
 }
 
 // ScoreOutput 结算结果。
@@ -44,6 +45,9 @@ func Settle(in ScoreInput) ScoreOutput {
 	}
 	public := rob
 	for i := 0; i < in.BombCount; i++ {
+		public *= 2
+	}
+	for i := 0; i < in.RevealCount; i++ {
 		public *= 2
 	}
 	if in.Spring || in.AntiSpring {

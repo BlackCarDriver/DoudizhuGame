@@ -274,3 +274,14 @@ func TestSettleRakeThresholdAndCap(t *testing.T) {
 		t.Fatalf("地主应扣除 30 抽水，得到 %+v", capped.Deltas)
 	}
 }
+
+func TestSettleRevealMultiplier(t *testing.T) {
+	out := Settle(ScoreInput{
+		Base: 1, RobMultiplier: 8, Landlord: 0, LandlordWon: true,
+		Balance:     [3]int{100, 100, 100},
+		RevealCount: 2,
+	})
+	if out.PublicMultiplier != 32 {
+		t.Fatalf("两次明牌后公共倍数应为 32，得到 %d", out.PublicMultiplier)
+	}
+}

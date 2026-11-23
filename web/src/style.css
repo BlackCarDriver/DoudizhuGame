@@ -35,12 +35,58 @@ button {
 #app {
   --game-vw: 1vw;
   --game-vh: 1vh;
-  --card-overlap: 2.2;
 }
 #app.portrait-rotated {
   --game-vw: 1vh;
   --game-vh: 1vw;
-  --card-overlap: 3;
+}
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.6vh;
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(70, 160, 112, 0.4), transparent 55%),
+    #0b2a1e;
+  color: var(--ink);
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+.loading-screen.hide {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.loading-title {
+  color: var(--gold);
+  font-size: clamp(1.5rem, 3.6vw, 2.4rem);
+  font-weight: 900;
+  letter-spacing: 0.25em;
+  text-indent: 0.25em;
+  text-shadow: 0 0 24px rgba(240, 195, 106, 0.22);
+}
+.loading-bar {
+  width: min(60vw, 320px);
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(240, 195, 106, 0.2);
+}
+.loading-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #d9a63f, #f7d58d);
+  transition: width 0.12s ease;
+}
+.loading-text {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
 }
 .game-rotator {
   position: absolute;
@@ -275,7 +321,8 @@ button {
 .seat-main {
   display: flex;
   align-items: center;
-  gap: calc(0.8 * var(--game-vw));
+  /* 头像与昵称/分数之间多留一个字宽 */
+  gap: calc(0.8 * var(--game-vw) + 1em);
   min-width: 0;
 }
 .avatar-host {
@@ -467,6 +514,7 @@ button {
 
 /* 聊天气泡 */
 .bubble {
+  --bubble-bg: #fff;
   position: absolute;
   left: 50%;
   bottom: calc(100% + 8px);
@@ -476,12 +524,13 @@ button {
   max-width: 10em;
   padding: 0.4em 0.7em;
   border-radius: 10px;
-  background: #fff;
+  background: var(--bubble-bg);
   color: #2a2c33;
   font-size: 12px;
   line-height: 1.4;
   text-align: left;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+  /* 让阴影包住尾巴，避免气泡和尖角出现明显接缝/色差 */
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.16));
   pointer-events: none;
   z-index: 30;
   word-break: break-word;
@@ -491,24 +540,27 @@ button {
   content: '';
   position: absolute;
   left: 50%;
-  bottom: -5px;
-  width: 10px;
-  height: 10px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
   border-radius: 2px;
-  background: #fff;
+  background: var(--bubble-bg);
   transform: translateX(-50%) rotate(45deg);
 }
 .bubble.text {
+  display: block;
+  overflow: visible;
+}
+.bubble-text {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
 .bubble.emotion {
-  background: #fff;
+  background: var(--bubble-bg);
   padding: 0.25em;
   max-width: 120px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
 }
 .bubble.emotion::after {
   display: block;
@@ -581,6 +633,52 @@ button {
   inset: 0;
   z-index: 9000;
   pointer-events: none;
+}
+.play-fly-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+}
+.play-fly {
+  position: fixed;
+  margin: 0;
+  transform-origin: center center;
+}
+.play-fly-rotate {
+  position: absolute;
+  transform-origin: center center;
+}
+.play-fly .play-fly-card {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  pointer-events: none;
+}
+.play-fly .play-fly-card img {
+  width: 100%;
+  height: 100%;
+}
+.revealed-hand {
+  --revealed-card-w: clamp(28px, calc(3.1 * var(--game-vw)), 44px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100%;
+  margin-top: calc(0.55 * var(--game-vh));
+  pointer-events: none;
+}
+.revealed-hand .card {
+  width: var(--revealed-card-w);
+  margin-left: calc(var(--revealed-card-w) * -0.5);
+}
+.revealed-hand .card:first-child {
+  margin-left: 0;
+}
+.revealed-hand .card img {
+  border-radius: 5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
 }
 .reveal-move {
   position: fixed;
@@ -679,7 +777,8 @@ button {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
   opacity: 0.9;
 }
-.table-action .pass-tag {
+.table-action .pass-tag,
+.table-action .bid-tag {
   background: transparent;
   border: none;
   padding: 0;
@@ -687,6 +786,7 @@ button {
   font-size: 1.64rem;
   font-weight: 800;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
 }
 .action-cards {
   display: flex;
@@ -852,6 +952,14 @@ button {
 .spec-chip:first-child {
   margin-left: 0;
 }
+.spec-chip .avatar-wrap.tiny {
+  width: 30px;
+  height: 30px;
+}
+.spec-cell .avatar-wrap.small {
+  width: 46px;
+  height: 46px;
+}
 .spec-more {
   border: 1px solid rgba(240, 195, 106, 0.35);
   background: rgba(0, 0, 0, 0.25);
@@ -911,7 +1019,8 @@ button {
   padding: 0 calc(1 * var(--game-vw));
 }
 .hand-cards .card {
-  margin-left: calc(var(--card-overlap) * var(--game-vw) * -1);
+  /* 后一张牌的左边缘落在前一张牌的中心轴上 */
+  margin-left: calc(var(--card-width) * -0.5);
   transition: transform 0.12s ease, filter 0.12s ease;
 }
 .hand-cards .card:first-child {
@@ -939,9 +1048,10 @@ button {
 
 /* 牌 */
 .card {
+  --card-width: clamp(42px, calc(5.1 * var(--game-vw)), 76px);
   position: relative;
   flex: 0 0 auto;
-  width: clamp(42px, calc(5.1 * var(--game-vw)), 76px);
+  width: var(--card-width);
   aspect-ratio: 160 / 224;
   padding: 0;
   border: none;
@@ -959,13 +1069,12 @@ button {
 }
 .card.selected {
   transform: translateY(calc(-1.8 * var(--game-vh)));
-  filter: drop-shadow(0 0 8px rgba(240, 195, 106, 0.85));
 }
 .card:hover {
   transform: translateY(calc(-1.8 * var(--game-vh)));
 }
 .card.selected img {
-  box-shadow: 0 0 0 2px var(--gold), 0 8px 18px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
 }
 .card.disabled {
   cursor: default;
@@ -1135,8 +1244,8 @@ button {
   top: calc(66.5 * var(--game-vh));
   bottom: calc(1.4 * var(--game-vw));
   z-index: 6;
-  width: calc(22 * var(--game-vw));
-  max-width: 320px;
+  width: calc(18.7 * var(--game-vw));
+  max-width: 272px;
   display: none;
   flex-direction: column;
   border-radius: 12px;
@@ -1182,13 +1291,7 @@ button {
   gap: calc(0.35 * var(--game-vh));
 }
 .chat-row {
-  display: flex;
-  align-items: flex-start;
-  gap: calc(0.35 * var(--game-vw));
-}
-.chat-avatar {
-  flex: 0 0 auto;
-  display: flex;
+  display: block;
 }
 .chat-body {
   min-width: 0;
@@ -1328,6 +1431,39 @@ button {
   background: rgba(240, 195, 106, 0.09);
   border-color: rgba(240, 195, 106, 0.28);
 }
+.rr-remain {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.25em;
+  min-height: 24px;
+  margin-top: 0.25em;
+  padding-top: 0.3em;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.rr-remain-label {
+  flex: 0 0 auto;
+  margin-right: 0.2em;
+  color: var(--muted);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}
+.rr-remain .card {
+  width: 24px;
+  margin-left: -7px;
+}
+.rr-remain .card:first-of-type {
+  margin-left: 0;
+}
+.rr-remain .card img {
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.28);
+}
+.rr-remain-empty {
+  color: rgba(220, 240, 228, 0.45);
+  font-size: 0.68rem;
+}
 .rr-role {
   flex: 0 0 auto;
   display: inline-block;
@@ -1380,10 +1516,19 @@ button {
 }
 
 /* 排行榜 */
+.board-panel {
+  border-radius: 20px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
 .board-list {
   display: flex;
   flex-direction: column;
   gap: calc(0.35 * var(--game-vh));
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 .board-loading {
   text-align: center;
@@ -1552,9 +1697,6 @@ button {
 /* ---------------- 响应式 ---------------- */
 
 @media (max-width: 900px) {
-  #app {
-    --card-overlap: 3;
-  }
   .seat-slot {
     width: calc(33 * var(--game-vw));
   }
@@ -1613,8 +1755,8 @@ button {
     font-size: 0.62rem;
   }
   .chat-panel {
-    width: calc(28 * var(--game-vw));
-    max-width: 260px;
+    width: calc(23.8 * var(--game-vw));
+    max-width: 221px;
     top: calc(69.5 * var(--game-vh));
     bottom: calc(1.4 * var(--game-vw));
   }

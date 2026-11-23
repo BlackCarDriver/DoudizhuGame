@@ -51,17 +51,18 @@ func main() {
 	flag.StringVar(&cfg.PublicKeyPath, "pubkey", pickString(fileCfg.PublicKeyPath, "PUBKEY", "config/plugin_jwt.pub.pem"), "聊天室验签公钥 PEM 路径")
 	flag.IntVar(&cfg.CountdownSeconds, "countdown-seconds", pickInt(fileCfg.CountdownSeconds, "COUNTDOWN_SECONDS", 3), "开局倒数（秒）")
 	flag.IntVar(&cfg.BidSeconds, "bid-seconds", pickInt(fileCfg.BidSeconds, "BID_SECONDS", 15), "叫抢地主每轮读条（秒）")
-	flag.IntVar(&cfg.DoubleSeconds, "double-seconds", pickInt(fileCfg.DoubleSeconds, "DOUBLE_SECONDS", 5), "加倍读条（秒）")
+	flag.IntVar(&cfg.DoubleSeconds, "double-seconds", pickInt(fileCfg.DoubleSeconds, "DOUBLE_SECONDS", 10), "加倍/明牌选择读条（秒）")
 	flag.IntVar(&cfg.TurnSeconds, "turn-seconds", pickInt(fileCfg.TurnSeconds, "TURN_SECONDS", 30), "每手出牌时间（秒）")
 	flag.IntVar(&cfg.SeatGraceSeconds, "seat-grace-seconds", pickInt(fileCfg.SeatGraceSeconds, "SEAT_GRACE_SECONDS", 20), "掉线保留座位宽限期（秒）")
 	flag.BoolVar(&cfg.AllowSpectatorHands, "allow-spectator-hands", pickBool(fileCfg.AllowSpectatorHand, "ALLOW_SPECTATOR_HANDS", true), "是否允许观众看牌（默认开）")
 	flag.IntVar(&cfg.InitialPoints, "initial-points", pickIntPtr(fileCfg.InitialPoints, "INITIAL_POINTS", 100), "新玩家首次进入的启动积分")
 	flag.IntVar(&cfg.MinPointsToSit, "min-points-to-sit", pickIntPtr(fileCfg.MinPointsToSit, "MIN_POINTS_TO_SIT", 50), "最低上桌积分，同时也是破产救济目标")
 	flag.IntVar(&cfg.DailyActiveReward, "daily-active-reward", pickIntPtr(fileCfg.DailyActiveReward, "DAILY_ACTIVE_REWARD", 10), "每日完成至少一局后的活跃奖励")
-	flag.IntVar(&cfg.RakePercent, "rake-percent", pickIntPtr(fileCfg.RakePercent, "RAKE_PERCENT", 5), "赢家正收益抽水百分比")
+	flag.IntVar(&cfg.RakePercent, "rake-percent", pickIntPtr(fileCfg.RakePercent, "RAKE_PERCENT", 0), "赢家正收益抽水百分比")
 	flag.IntVar(&cfg.RakeMinProfit, "rake-min-profit", pickIntPtr(fileCfg.RakeMinProfit, "RAKE_MIN_PROFIT", 10), "低于该利润不抽水")
 	flag.IntVar(&cfg.RakeCap, "rake-cap", pickIntPtr(fileCfg.RakeCap, "RAKE_CAP", 30), "单个赢家单局抽水上限")
-	flag.IntVar(&cfg.BaseScore, "base-score", pickInt(fileCfg.BaseScore, "BASE_SCORE", 1), "底分")
+	flag.IntVar(&cfg.TableFee, "table-fee", pickIntPtr(fileCfg.TableFee, "TABLE_FEE", 1), "每局每位玩家上缴系统的桌费")
+	flag.IntVar(&cfg.BaseScore, "base-score", pickInt(fileCfg.BaseScore, "BASE_SCORE", 2), "底分/最低押注积分")
 	flag.StringVar(&cfg.DataDir, "data-dir", pickString(fileCfg.DataDir, "DATA_DIR", "data"), "本地存档目录（players.json）")
 	flag.IntVar(&cfg.BoardLimit, "board-limit", pickInt(fileCfg.BoardLimit, "BOARD_LIMIT", 100), "排行榜返回条数")
 	adminNicks := pickList(fileCfg.AdminNicks, "ADMIN_NICKS", nil)
@@ -104,6 +105,9 @@ func main() {
 	}
 	if cfg.RakeCap < 0 {
 		cfg.RakeCap = 0
+	}
+	if cfg.TableFee < 0 {
+		cfg.TableFee = 0
 	}
 	if cfg.SeatGraceSeconds < 1 {
 		cfg.SeatGraceSeconds = 20
@@ -188,8 +192,8 @@ func main() {
 	} else {
 		log.Printf("斗地主服务启动于 %s（页面模式：可打开页面，但无法取得游戏身份）", cfg.Addr)
 	}
-	log.Printf("  经济：初始 %d / 上桌 %d / 活跃奖励 %d / 抽水 %d%%（利润≥%d，上限%d）",
-		cfg.InitialPoints, cfg.MinPointsToSit, cfg.DailyActiveReward, cfg.RakePercent, cfg.RakeMinProfit, cfg.RakeCap)
+	log.Printf("  经济：初始 %d / 上桌 %d / 底分 %d / 桌费 %d / 活跃奖励 %d / 百分比抽水 %d%%（利润≥%d，上限%d）",
+		cfg.InitialPoints, cfg.MinPointsToSit, cfg.BaseScore, cfg.TableFee, cfg.DailyActiveReward, cfg.RakePercent, cfg.RakeMinProfit, cfg.RakeCap)
 	log.Printf("  单局：叫抢 %d 秒 / 加倍 %d 秒 / 出牌 %d 秒 / 断线宽限 %d 秒 / 观众看牌 %v",
 		cfg.BidSeconds, cfg.DoubleSeconds, cfg.TurnSeconds, cfg.SeatGraceSeconds, cfg.AllowSpectatorHands)
 	log.Printf("  页面目录 %s · 积分存档 %s", absWeb, filepath.Join(cfg.DataDir, "players.json"))

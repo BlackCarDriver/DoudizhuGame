@@ -30,6 +30,9 @@ function cardSVG(rank, suit) {
   const label = rankLabel(rank)
   const { sym, color } = suits[suit]
   const topSize = 78
+  // 估算顶部数字/字母的视觉中心，让左上小花色与它水平居中对齐。
+  const rankEm = label === '10' ? 1.112 : ({ J: 0.556, Q: 0.778, K: 0.667, A: 0.722 }[label] || 0.556)
+  const rankCenter = 8 + (rankEm * topSize * 0.86) / 2
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 224" width="160" height="224">
   <defs><filter id="s" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity=".18"/></filter></defs>
   <rect x="3" y="3" width="154" height="218" rx="14" fill="#fdfdfb" stroke="#cfc7b8" stroke-width="2" filter="url(#s)"/>
@@ -37,14 +40,8 @@ function cardSVG(rank, suit) {
   <g transform="translate(8 0) scale(0.86 1)">
     <text x="0" y="72" font-family="Arial, Helvetica, sans-serif" font-size="${topSize}" font-weight="800" fill="${color}">${label}</text>
   </g>
-  <text x="8" y="126" font-family="Georgia, serif" font-size="52" fill="${color}">${sym}</text>
-  <text x="84" y="150" text-anchor="middle" font-family="Georgia, serif" font-size="90" fill="${color}" opacity=".92">${sym}</text>
-  <g transform="rotate(180 80 112)">
-    <g transform="translate(8 0) scale(0.86 1)">
-      <text x="0" y="72" font-family="Arial, Helvetica, sans-serif" font-size="${topSize}" font-weight="800" fill="${color}">${label}</text>
-    </g>
-    <text x="8" y="126" font-family="Georgia, serif" font-size="52" fill="${color}">${sym}</text>
-  </g>
+  <text x="${rankCenter}" y="126" text-anchor="middle" font-family="Georgia, serif" font-size="52" fill="${color}" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">${sym}</text>
+  <text x="98" y="190" text-anchor="middle" font-family="Georgia, serif" font-size="135" fill="${color}" opacity=".92" stroke="${color}" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round">${sym}</text>
 </svg>`
 }
 
@@ -60,10 +57,6 @@ function jokerSVG(big) {
     <text x="18" y="62">常</text>
   </g>
   <image href="data:image/png;base64,${img}" x="40" y="64" width="80" height="104" preserveAspectRatio="xMidYMid meet" />
-  <g transform="rotate(180 80 112)" fill="${color}" font-family="'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="22" font-weight="800">
-    <text x="18" y="38">日</text>
-    <text x="18" y="62">常</text>
-  </g>
 </svg>`
 }
 

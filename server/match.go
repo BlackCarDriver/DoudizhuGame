@@ -23,15 +23,17 @@ type ActionInfo struct {
 }
 
 type PlayerResult struct {
-	Seat       string `json:"seat"`
-	Nick       string `json:"nick"`
-	Avatar     string `json:"avatar"`
-	Role       string `json:"role"`
-	Double     bool   `json:"double"`
-	Delta      int    `json:"delta"`
-	Points     int    `json:"points"`
-	Rake       int    `json:"rake,omitempty"`
-	DailyBonus int    `json:"dailyBonus,omitempty"`
+	Seat       string       `json:"seat"`
+	Nick       string       `json:"nick"`
+	Avatar     string       `json:"avatar"`
+	Role       string       `json:"role"`
+	Double     bool         `json:"double"`
+	Delta      int          `json:"delta"`
+	Points     int          `json:"points"`
+	Rake       int          `json:"rake,omitempty"`
+	TableFee   int          `json:"tableFee,omitempty"`
+	DailyBonus int          `json:"dailyBonus,omitempty"`
+	Remain     []rules.Card `json:"remain"`
 }
 
 type ResultInfo struct {
@@ -44,6 +46,7 @@ type ResultInfo struct {
 	PublicMultiplier int            `json:"publicMultiplier"`
 	Base             int            `json:"base"`
 	Rake             int            `json:"rake,omitempty"`
+	TableFee         int            `json:"tableFee,omitempty"`
 	Players          []PlayerResult `json:"players"`
 	Reason           string         `json:"reason"`
 }
@@ -79,6 +82,7 @@ type Match struct {
 	Double        [3]bool
 	DoubleDone    [3]bool
 	DoubleActions [3]string
+	Reveal        [3]bool
 
 	LastPlay    *PlayInfo
 	LastPlayer  int
@@ -142,6 +146,10 @@ func (h *Hub) sitAt(nick, want string) string {
 	if h.activeMatchLocked() {
 		h.lock.Unlock()
 		return "对局中不能换座"
+	}
+	// 上一局已经结束：新玩家上坐时清理旧手牌和结算，避免继续显示上一局剩余牌。
+	if h.match != nil && h.match.Phase == "over" {
+		h.clearFinishedMatchLocked()
 	}
 	wantIdx := seatIndex(want)
 	current := h.seatOfNickLocked(nick)
@@ -421,6 +429,7 @@ func (h *Hub) beginDealLocked() {
 	m.Double = [3]bool{}
 	m.DoubleDone = [3]bool{}
 	m.DoubleActions = [3]string{}
+	m.Reveal = [3]bool{}
 	m.LastPlay = nil
 	m.LastPlayer = -1
 	m.PassCount = 0
@@ -519,6 +528,7 @@ func (h *Hub) bidLocked(seat int, action string) string {
 			m.Bottom = bottom
 			m.BidActions = [3]string{}
 			m.CallPassed = [3]bool{}
+			m.Reveal = [3]bool{}
 			m.RobMultiplier = 1
 			m.BidTurn = rand.Intn(3)
 			m.Turn = m.BidTurn
@@ -608,6 +618,30 @@ func (h *Hub) startDoublingLocked() {
 		h.startPlayingLocked()
 	}
 	log.Printf("[match #%d] 地主 %s，倍数 x%d", m.ID, seatAt(m.Landlord), m.RobMultiplier)
+}
+
+func (h *Hub) reveal(nick string, value bool) string {
+	h.lock.Lock()
+	seat := h.controlledSeatLocked(nick)
+	if seat < 0 {
+		h.lock.Unlock()
+		return "先上座"
+	}
+	err := h.revealLocked(seat, value)
+	h.lock.Unlock()
+	if err == "" {
+		h.syncAll()
+	}
+	return err
+}
+
+func (h *Hub) revealLocked(seat int, value bool) string {
+	m := h.match
+	if m == nil || m.Phase != "doubling" {
+		return "只能在加倍阶段选择明牌"
+	}
+	m.Reveal[seat] = value
+	return ""
 }
 
 func (h *Hub) double(nick string, value bool) string {
@@ -901,6 +935,12 @@ func (h *Hub) finishRoundLocked(winnerSeat int) {
 			balances[i] = h.store.Points(h.seats[i].Nick)
 		}
 	}
+	revealCount := 0
+	for _, revealed := range m.Reveal {
+		if revealed {
+			revealCount++
+		}
+	}
 	spring := false
 	antiSpring := false
 	if landlordWon {
@@ -933,6 +973,7 @@ func (h *Hub) finishRoundLocked(winnerSeat int) {
 	win := map[string]bool{}
 	avatars := map[string]string{}
 	players := make([]PlayerResult, 0, 3)
+	totalTableFee := 0
 	for i := 0; i < 3; i++ {
 		if h.seats[i].Nick == "" {
 			continue
@@ -946,13 +987,24 @@ func (h *Hub) finishRoundLocked(winnerSeat int) {
 		if np < 0 {
 			np = 0
 		}
+		fee := 0
+		if h.cfg.TableFee > 0 && np > 0 {
+			fee = h.cfg.TableFee
+			if fee > np {
+				fee = np
+			}
+			np -= fee
+		}
+		netDelta := out.Deltas[i] - fee
 		h.seats[i].Points = np
-		deltas[h.seats[i].Nick] = out.Deltas[i]
+		deltas[h.seats[i].Nick] = netDelta
 		win[h.seats[i].Nick] = won
 		avatars[h.seats[i].Nick] = h.seats[i].Avatar
+		totalTableFee += fee
 		players = append(players, PlayerResult{
 			Seat: seatAt(i), Nick: h.seats[i].Nick, Avatar: h.seats[i].Avatar,
-			Role: role, Double: m.Double[i], Delta: out.Deltas[i], Points: np, Rake: out.Rakes[i],
+			Role: role, Double: m.Double[i], Delta: netDelta, Points: np, Rake: out.Rakes[i], TableFee: fee,
+			Remain: append([]rules.Card{}, m.Hands[i]...),
 		})
 	}
 	h.store.ApplyResult(deltas, win, avatars)
@@ -989,11 +1041,14 @@ func (h *Hub) finishRoundLocked(winnerSeat int) {
 	if out.Rake > 0 {
 		log.Printf("[match #%d] 抽水 %d 分（赢家正收益 %d%%）", m.ID, out.Rake, h.cfg.RakePercent)
 	}
+	if totalTableFee > 0 {
+		log.Printf("[match #%d] 桌费 %d 分（每人 %d）", m.ID, totalTableFee, h.cfg.TableFee)
+	}
 	m.Result = &ResultInfo{
 		WinnerSide: m.WinnerSide, Landlord: seatAt(m.Landlord),
 		Spring: spring, AntiSpring: antiSpring, BombCount: m.BombCount,
 		RobMultiplier: m.RobMultiplier, PublicMultiplier: out.PublicMultiplier,
-		Base: h.cfg.BaseScore, Rake: out.Rake, Players: players, Reason: "normal",
+		Base: h.cfg.BaseScore, Rake: out.Rake, TableFee: totalTableFee, Players: players, Reason: "normal",
 	}
 	for i := 0; i < 3; i++ {
 		h.ready[i] = false
