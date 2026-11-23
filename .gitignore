@@ -1,0 +1,14 @@
+node_modules/
+web/dist/
+server/data/
+.dev/
+*.log
+.DS_Store
+server/doudizhu
+server/shell/*.pid
+
+# 真实接入配置含桥接密钥，不入库；用 integration.example.json 复制填写
+server/config/integration.json
+.env
+.env.*
+*.pid

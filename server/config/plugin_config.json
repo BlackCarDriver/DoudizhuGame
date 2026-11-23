@@ -1,0 +1,17 @@
+{
+  "addr": ":8090",
+  "webRoot": "../web/dist",
+  "instanceId": "doudizhu-1",
+  "pubkey": "config/plugin_jwt.pub.pem",
+  "countdownSeconds": 3,
+  "bidSeconds": 15,
+  "doubleSeconds": 5,
+  "turnSeconds": 30,
+  "seatGraceSeconds": 20,
+  "allowSpectatorHands": true,
+  "initialPoints": 100,
+  "dailyGift": 10,
+  "baseScore": 1,
+  "dataDir": "data",
+  "boardLimit": 100
+}

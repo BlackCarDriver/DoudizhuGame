@@ -1,0 +1,1585 @@
+:root {
+  --felt-1: #1f6b4a;
+  --felt-2: #0b2a1e;
+  --gold: #f0c36a;
+  --gold-2: #d9a63f;
+  --ink: #f8f2df;
+  --muted: #b9d4c4;
+  --red: #e25b5b;
+  --green: #5fd39a;
+  --panel: #14241d;
+  --card-overlap: 2.2vw;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #0b2a1e;
+  color: var(--ink);
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
+  user-select: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+.game {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.felt {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(70, 160, 112, 0.55) 0%, rgba(23, 93, 64, 0.9) 42%, rgba(7, 31, 22, 1) 100%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.018) 0 2px, transparent 2px 7px);
+}
+
+.felt-glow {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 62vw;
+  height: 62vw;
+  max-width: 900px;
+  max-height: 900px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 226, 160, 0.12), transparent 62%);
+  pointer-events: none;
+}
+
+/* ---------------- 顶栏 ---------------- */
+
+.topbar {
+  position: relative;
+  z-index: 10;
+  height: 8vh;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 2vw;
+  pointer-events: none;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6vw;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.brand-mark {
+  color: var(--gold);
+  font-size: 1.5rem;
+}
+
+.brand-title {
+  font-size: clamp(1.1rem, 2vw, 1.7rem);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.brand-sub {
+  color: var(--muted);
+  font-size: clamp(0.6rem, 0.9vw, 0.8rem);
+  letter-spacing: 0.18em;
+}
+
+.top-right {
+  display: flex;
+  align-items: center;
+  gap: 0.7vw;
+  pointer-events: auto;
+}
+
+.conn {
+  font-size: 0.72rem;
+  color: var(--muted);
+  max-width: 26vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.35em 0.8em;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.conn.online::before,
+.conn.reconnecting::before,
+.conn.offline::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 0.45em;
+  background: var(--green);
+}
+.conn.reconnecting::before {
+  background: #f0b45b;
+}
+.conn.offline::before {
+  background: var(--red);
+}
+.conn.reconnecting,
+.conn.offline {
+  color: #ffd9a8;
+}
+
+.my-points {
+  font-size: 0.82rem;
+  color: var(--gold);
+  max-width: 22vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon-btn {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 0.6em;
+  border-radius: 10px;
+  border: 1px solid rgba(240, 195, 106, 0.3);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.9rem;
+  backdrop-filter: blur(6px);
+}
+.icon-btn:hover {
+  border-color: var(--gold);
+}
+
+/* ---------------- 对手座位 ---------------- */
+
+.opponents {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 9vh;
+  height: 28vh;
+  pointer-events: none;
+}
+
+.seat-slot {
+  position: absolute;
+  width: 27vw;
+  max-width: 370px;
+  pointer-events: auto;
+}
+.seat-slot.left {
+  left: 2.2vw;
+  top: 0;
+}
+.seat-slot.right {
+  right: 2.2vw;
+  top: 0;
+}
+
+.seat-card {
+  position: relative;
+  padding: 2.25vh 1.25vw 1.2vh;
+  border-radius: 16px;
+  background: linear-gradient(160deg, rgba(9, 36, 26, 0.72), rgba(4, 18, 13, 0.62));
+  border: 1px solid rgba(240, 195, 106, 0.22);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  min-height: 12vh;
+}
+.seat-card.turn {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(240, 195, 106, 0.35), 0 0 30px rgba(240, 195, 106, 0.18);
+}
+.seat-card.is-auto {
+  opacity: 0.85;
+}
+.seat-card.landlord {
+  background: linear-gradient(160deg, rgba(73, 39, 15, 0.72), rgba(20, 12, 6, 0.7));
+  border-color: rgba(240, 195, 106, 0.55);
+}
+.seat-card.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3vh;
+  border-style: dashed;
+  color: var(--muted);
+  min-height: 13vh;
+  width: 100%;
+  font: inherit;
+  text-align: center;
+}
+.seat-card.empty:hover {
+  border-color: var(--gold);
+  color: var(--ink);
+}
+.empty-plus {
+  font-size: 1.6rem;
+  color: var(--gold);
+  line-height: 1;
+}
+.empty-text {
+  font-size: 0.95rem;
+}
+.seat-card.empty small {
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+
+.seat-main {
+  display: flex;
+  align-items: center;
+  gap: 0.8vw;
+  min-width: 0;
+}
+.avatar-host {
+  position: relative;
+  flex: 0 0 auto;
+}
+.seat-copy {
+  min-width: 0;
+  flex: 1;
+}
+.seat-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  font-size: clamp(0.85rem, 1.15vw, 1.05rem);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.seat-meta {
+  display: flex;
+  gap: 0.7em;
+  margin-top: 0.2em;
+  font-size: clamp(0.62rem, 0.8vw, 0.76rem);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.seat-meta .points {
+  color: var(--gold);
+}
+.seat-meta .double-tag {
+  color: var(--gold);
+}
+.seat-state {
+  margin-top: 0.2em;
+  font-size: clamp(0.6rem, 0.78vw, 0.74rem);
+  color: var(--gold);
+  min-height: 1.1em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.role-badge {
+  font-size: 0.62rem;
+  padding: 0.1em 0.45em;
+  border-radius: 999px;
+  background: rgba(95, 211, 154, 0.18);
+  color: var(--green);
+  border: 1px solid rgba(95, 211, 154, 0.35);
+  flex: 0 0 auto;
+}
+.role-badge.landlord {
+  background: rgba(240, 195, 106, 0.2);
+  color: var(--gold);
+  border-color: rgba(240, 195, 106, 0.5);
+}
+
+/* 头像 */
+.avatar-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+}
+.avatar-wrap.large {
+  width: 68px;
+  height: 68px;
+}
+.avatar-wrap.small {
+  width: 42px;
+  height: 42px;
+}
+.avatar-wrap.tiny {
+  width: 27px;
+  height: 27px;
+}
+.avatar {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--h, 150), 42%, 34%);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.1rem;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+}
+.avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  z-index: 1;
+}
+.avatar-img.broken {
+  display: none;
+}
+.avatar-emoji {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.avatar-frame {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  transform: scale(1.35);
+  pointer-events: none;
+  z-index: 2;
+  filter: drop-shadow(0 0 4px rgba(240, 195, 106, 0.35));
+}
+
+/* 时钟 */
+.clock {
+  position: absolute;
+  top: -15px;
+  right: -6px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.1em;
+  padding: 0.15em 0.5em;
+  border-radius: 999px;
+  background: #121713;
+  border: 2px solid var(--gold);
+  color: var(--gold);
+  font-size: clamp(0.95rem, 1.2vw, 1.15rem);
+  font-weight: 700;
+  opacity: 0.78;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+.clock.urgent {
+  border-color: var(--red);
+  color: #ffb1b1;
+  opacity: 0.95;
+}
+.clock-icon {
+  font-size: 1.8em;
+  line-height: 1;
+}
+
+/* 最近动作（已移到牌桌中央的 table-actions） */
+.pass-tag {
+  display: inline-block;
+  padding: 0.15em 0.7em;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 160, 160, 0.45);
+  color: #ffc0c0;
+  background: rgba(120, 20, 20, 0.25);
+  font-size: 0.72rem;
+}
+.combo-tag {
+  font-size: 0.65rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* 聊天气泡 */
+.bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  top: auto;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 10em;
+  padding: 0.4em 0.7em;
+  border-radius: 10px;
+  background: #fff;
+  color: #2a2c33;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+  pointer-events: none;
+  z-index: 30;
+  word-break: break-word;
+  animation: bubbleIn 0.15s ease-out;
+}
+.bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: #fff;
+  transform: translateX(-50%) rotate(45deg);
+}
+.bubble.text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.bubble.emotion {
+  background: #fff;
+  padding: 0.25em;
+  max-width: 120px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+}
+.bubble.emotion::after {
+  display: block;
+}
+.bubble.emotion img {
+  max-width: 100px;
+  max-height: 100px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.3));
+}
+
+/* ---------------- 顶部 HUD ---------------- */
+
+.top-hud {
+  position: absolute;
+  top: 5.4vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25vh;
+  pointer-events: none;
+}
+
+/* ---------------- 中央牌桌 ---------------- */
+
+.center {
+  position: absolute;
+  left: 50%;
+  top: 43%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8vh;
+  pointer-events: none;
+  width: 52vw;
+  max-width: 760px;
+}
+.center.dealing {
+  animation: dealFlash 0.7s ease-out;
+}
+.center.played {
+  animation: playFlash 0.42s ease-out;
+}
+.center.shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+.bottom-cards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3vh;
+  min-height: 5vh;
+  transition: opacity 0.12s ease;
+}
+.bottom-cards.flying {
+  opacity: 0.15;
+}
+.bottom-fly-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+}
+.bottom-fly-layer .fly-card {
+  position: fixed;
+  margin: 0;
+  z-index: 9001;
+  pointer-events: none;
+}
+.bottom-label {
+  font-size: 0.66rem;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+.mini-cards {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1px;
+}
+/* ---------------- 牌桌中央的上一手动作 ---------------- */
+
+.table-actions {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.table-action {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25vh;
+  padding: 0;
+  max-width: 40vw;
+}
+.table-action.self {
+  left: 50%;
+  bottom: calc(28.5vh + 4.8vw);
+  transform: translateX(-50%);
+}
+.table-action.left {
+  left: 25vw;
+  top: calc(46% - 4.8vw);
+  transform: translate(-50%, -50%);
+}
+.table-action.right {
+  right: 25vw;
+  top: calc(46% - 4.8vw);
+  transform: translate(50%, -50%);
+}
+.table-action .double-choice {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--gold);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+  opacity: 0.9;
+}
+.table-action .pass-tag {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: #ffc0c0;
+  font-size: 1.64rem;
+  font-weight: 800;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+}
+.action-cards {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+}
+.action-cards .card {
+  width: clamp(42px, 5.1vw, 76px);
+  margin-left: -1.5vw;
+}
+.action-cards .card:first-child {
+  margin-left: 0;
+}
+.action-cards .card img {
+  border-radius: 5px;
+}
+.selection-hint {
+  font-size: clamp(0.66rem, 0.78vw, 0.76rem);
+  color: #ffb3b3;
+  padding: 0.25em 0.55em;
+  border-radius: 999px;
+  background: rgba(120, 20, 20, 0.22);
+  white-space: nowrap;
+}
+.center-empty {
+  color: rgba(220, 240, 228, 0.55);
+  font-size: 0.82rem;
+  padding: 1vh 0;
+}
+.center-status {
+  font-size: clamp(1.17rem, 1.5vw, 1.38rem);
+  color: var(--muted);
+  text-align: center;
+  min-height: 1.4em;
+}
+.center-status b {
+  color: var(--ink);
+}
+.phase-tag {
+  display: inline-block;
+  padding: 0.1em 0.6em;
+  border-radius: 999px;
+  background: rgba(240, 195, 106, 0.15);
+  border: 1px solid rgba(240, 195, 106, 0.35);
+  color: var(--gold);
+  font-size: 0.78em;
+  margin-right: 0.4em;
+}
+.phase-tag.my-turn {
+  background: rgba(95, 211, 154, 0.18);
+  border-color: rgba(95, 211, 154, 0.5);
+  color: var(--green);
+  opacity: 0.85;
+}
+.phase-tag.over {
+  background: rgba(226, 91, 91, 0.18);
+  border-color: rgba(226, 91, 91, 0.4);
+  color: #ffb3b3;
+}
+.countdown {
+  font-size: clamp(2rem, 5vw, 4rem);
+  font-weight: 900;
+  color: var(--gold);
+  text-shadow: 0 0 24px rgba(240, 195, 106, 0.45);
+  line-height: 1;
+}
+.countdown-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  letter-spacing: 0.25em;
+}
+.multiplier {
+  position: absolute;
+  left: calc(100% + 0.6vw);
+  top: 0.4vh;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.2vh;
+  min-height: 0;
+  white-space: nowrap;
+}
+.mult-item {
+  font-size: clamp(0.66rem, 0.85vw, 0.8rem);
+  color: var(--muted);
+  padding: 0.15em 0.6em;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.mult-item b {
+  color: var(--gold);
+}
+.mult-item.hot {
+  color: #ffb3b3;
+  border-color: rgba(226, 91, 91, 0.4);
+}
+
+/* ---------------- 观众 ---------------- */
+
+.spectator-bar {
+  position: absolute;
+  top: 25.5vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 0.6vw;
+  padding: 0.35vh 0.8vw;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px);
+  min-height: 34px;
+}
+.spectator-bar.in-seat {
+  position: absolute;
+  right: 0.4vw;
+  bottom: -15px;
+  top: auto;
+  left: auto;
+  transform: none;
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  gap: 0.15vw;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  backdrop-filter: none;
+  z-index: 7;
+}
+.spectator-bar.in-seat .spec-more {
+  border: 0;
+  background: transparent;
+  padding: 0 0 0 0.15em;
+  color: var(--gold);
+  font-size: 0.72rem;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+.spec-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.spec-avatars {
+  display: flex;
+  align-items: center;
+}
+.spec-chip {
+  margin-left: -5px;
+  border-radius: 50%;
+  border: 2px solid rgba(11, 42, 30, 0.9);
+  display: flex;
+}
+.spec-chip:first-child {
+  margin-left: 0;
+}
+.spec-more {
+  border: 1px solid rgba(240, 195, 106, 0.35);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--gold);
+  border-radius: 999px;
+  padding: 0.15em 0.55em;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+/* ---------------- 自己区域 ---------------- */
+
+.self-area {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 36vh;
+  z-index: 4;
+  pointer-events: none;
+}
+.self-seat {
+  position: absolute;
+  left: 1.8vw;
+  bottom: 20.5vh;
+  width: 20vw;
+  max-width: 280px;
+  pointer-events: auto;
+}
+.self-seat .seat-card {
+  min-height: 10vh;
+}
+.hand-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: 3.6vh;
+  transform: translateX(-50%);
+  width: 97vw;
+  display: flex;
+  justify-content: center;
+  pointer-events: auto;
+}
+.hand {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 17vh;
+  justify-content: flex-end;
+  touch-action: none;
+}
+.hand-cards {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  padding: 0 1vw;
+}
+.hand-cards .card {
+  margin-left: calc(var(--card-overlap) * -1);
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+.hand-cards .card:first-child {
+  margin-left: 0;
+}
+.hand-cards.backs .card {
+  margin-left: -0.9vw;
+}
+.hand-empty {
+  color: rgba(220, 240, 228, 0.55);
+  font-size: 0.9rem;
+  padding: 3vh 0;
+}
+.spectator-hand-label {
+  margin-bottom: 0.8vh;
+  font-size: 0.76rem;
+  color: var(--gold);
+  padding: 0.2em 0.8em;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+}
+.spectator-hand-label b {
+  color: var(--ink);
+}
+
+/* 牌 */
+.card {
+  position: relative;
+  flex: 0 0 auto;
+  width: clamp(42px, 5.1vw, 76px);
+  aspect-ratio: 160 / 224;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transform: translateZ(0);
+}
+.card img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 8px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+.card.selected {
+  transform: translateY(-1.8vh);
+  filter: drop-shadow(0 0 8px rgba(240, 195, 106, 0.85));
+}
+.card:hover {
+  transform: translateY(-1.8vh);
+}
+.card.selected img {
+  box-shadow: 0 0 0 2px var(--gold), 0 8px 18px rgba(0, 0, 0, 0.35);
+}
+.card.disabled {
+  cursor: default;
+  pointer-events: none;
+}
+.card.small {
+  width: clamp(33px, 3.5vw, 51px);
+}
+.card.small img {
+  border-radius: 4px;
+}
+.card.back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card.back .back-count {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  background: var(--gold);
+  color: #291b06;
+  font-size: 0.6rem;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 0.05em 0.35em;
+}
+.opponent-backs {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  margin-top: 0.6vh;
+  min-height: 3vh;
+  pointer-events: none;
+}
+.opponent-backs .card {
+  width: clamp(16px, 1.45vw, 24px);
+  margin-left: -0.5vw;
+}
+.opponent-backs .card:first-child {
+  margin-left: 0;
+}
+.opponent-backs .card img {
+  border-radius: 3px;
+}
+
+/* 操作区 */
+.actions {
+  position: absolute;
+  left: 50%;
+  right: auto;
+  bottom: 20.5vh;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 0.55vw;
+  pointer-events: auto;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 70vw;
+}
+.my-countdown {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2em;
+  font-size: clamp(1.8rem, 3.2vw, 2.6rem);
+  font-weight: 800;
+  color: var(--gold);
+  opacity: 0.78;
+  line-height: 1.1;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+.my-countdown .clock-icon {
+  font-size: 1.1em;
+}
+.my-countdown .clock-num {
+  font-size: 1.15em;
+}
+.vote-toggle {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  padding: 0.35em 0.9em;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: clamp(0.78rem, 1vw, 0.92rem);
+  cursor: pointer;
+  user-select: none;
+}
+.vote-toggle input {
+  width: 1.1em;
+  height: 1.1em;
+  accent-color: var(--gold);
+}
+.vote-count {
+  color: var(--gold);
+  font-weight: 800;
+}
+.btn {
+  padding: 1.28vh 2.03vw;
+  min-width: 108px;
+  border-radius: 999px;
+  border: 1px solid rgba(240, 195, 106, 0.45);
+  background: rgba(6, 26, 18, 0.72);
+  color: var(--ink);
+  font-size: clamp(1.17rem, 1.47vw, 1.43rem);
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: transform 0.12s, filter 0.12s, background 0.12s;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+.btn.primary {
+  background: linear-gradient(180deg, #f7d58d, #d9a63f);
+  color: #2b1c08;
+  border-color: #ffe7ae;
+  font-weight: 800;
+}
+.btn.ghost {
+  background: rgba(0, 0, 0, 0.28);
+}
+.btn.tiny {
+  min-width: 0;
+  padding: 0.83vh 1.35vw;
+  font-size: 1.11rem;
+  font-weight: 500;
+  opacity: 0.85;
+}
+.btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+.waiting {
+  color: var(--muted);
+  font-size: clamp(0.72rem, 0.9vw, 0.86rem);
+  padding: 0.7vh 1vw;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+}
+.action-toast {
+  color: #ffd7a1;
+  font-size: 0.76rem;
+  padding: 0.4em 0.8em;
+  border-radius: 999px;
+  background: rgba(120, 60, 10, 0.3);
+}
+
+/* ---------------- 右下角聊天 ---------------- */
+
+.chat-panel {
+  position: absolute;
+  right: 1.4vw;
+  bottom: 21.5vh;
+  z-index: 6;
+  width: 22vw;
+  max-width: 320px;
+  max-height: 12vh;
+  display: none;
+  flex-direction: column;
+  border-radius: 12px;
+  background: rgba(5, 22, 15, 0.72);
+  border: 1px solid rgba(240, 195, 106, 0.18);
+  backdrop-filter: blur(6px);
+  overflow: hidden;
+  pointer-events: auto;
+}
+.chat-head {
+  flex: 0 0 auto;
+  padding: 0.5vh 0.6vw;
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  color: var(--gold);
+  border-bottom: 1px solid rgba(240, 195, 106, 0.12);
+}
+.chat-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.45vh 0.5vw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35vh;
+}
+.chat-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35vw;
+}
+.chat-avatar {
+  flex: 0 0 auto;
+  display: flex;
+}
+.chat-body {
+  min-width: 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+.chat-nick {
+  color: var(--gold);
+  font-weight: 700;
+  margin-right: 0.3em;
+}
+.chat-text {
+  color: #e8f4ec;
+  word-break: break-word;
+}
+.chat-emotion {
+  max-width: 60px;
+  max-height: 60px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+/* ---------------- 弹层 ---------------- */
+
+.modal-root {
+  position: static;
+  z-index: auto;
+}
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(2, 12, 8, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3vh 3vw;
+  animation: fadeIn 0.18s ease-out;
+}
+.panel {
+  width: min(92vw, 680px);
+  max-height: 84vh;
+  overflow: auto;
+  border-radius: 20px;
+  border: 1px solid rgba(240, 195, 106, 0.4);
+  background: linear-gradient(160deg, #1b2f26, #0d1c16 70%);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  padding: 2.4vh 2.4vw;
+  color: var(--ink);
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1vw;
+  margin-bottom: 1.4vh;
+}
+.panel-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+}
+.panel-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1vw;
+  margin-top: 2vh;
+  flex-wrap: wrap;
+}
+.result-panel {
+  width: min(92vw, 544px);
+  text-align: center;
+}
+.result-title {
+  font-size: clamp(1.6rem, 3.2vw, 2.6rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.4vh;
+}
+.result-title.win {
+  color: var(--gold);
+  text-shadow: 0 0 26px rgba(240, 195, 106, 0.35);
+}
+.result-title.lose {
+  color: #ff9f9f;
+}
+.result-title.neutral {
+  color: var(--gold);
+  text-shadow: 0 0 26px rgba(240, 195, 106, 0.25);
+}
+.result-sub {
+  color: var(--muted);
+  font-size: 0.86rem;
+  margin-bottom: 1vh;
+}
+.result-sub b {
+  color: var(--gold);
+}
+.mult-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4vw 0.9vw;
+  margin-bottom: 1.6vh;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.mult-breakdown span {
+  padding: 0.15em 0.6em;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+}
+.mult-breakdown .hot {
+  color: #ffb3b3;
+}
+.result-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vh;
+  margin: 0 auto;
+  max-width: 100%;
+}
+.result-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px 76px;
+  align-items: center;
+  gap: 0.5vw;
+  padding: 0.8vh 0.8vw;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: left;
+  font-size: 0.86rem;
+}
+.result-row.me {
+  background: rgba(240, 195, 106, 0.09);
+  border-color: rgba(240, 195, 106, 0.28);
+}
+.rr-role {
+  flex: 0 0 auto;
+  display: inline-block;
+  margin-left: 0.4em;
+  font-size: 0.62rem;
+  padding: 0.08em 0.4em;
+  border-radius: 999px;
+  text-align: center;
+  color: var(--green);
+  background: rgba(95, 211, 154, 0.12);
+  vertical-align: middle;
+}
+.rr-role.landlord {
+  color: var(--gold);
+  background: rgba(240, 195, 106, 0.14);
+}
+.rr-name {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+.rr-nick {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rr-name small {
+  flex: 0 0 auto;
+  margin-left: 0.4em;
+  color: var(--gold);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+.rr-delta {
+  font-weight: 800;
+  text-align: right;
+}
+.rr-delta.up {
+  color: var(--green);
+}
+.rr-delta.down {
+  color: #ff9f9f;
+}
+.rr-points {
+  text-align: right;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+/* 排行榜 */
+.board-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35vh;
+}
+.board-loading {
+  text-align: center;
+  color: var(--muted);
+  padding: 4vh 0;
+}
+.board-row {
+  display: grid;
+  grid-template-columns: 34px 32px 1fr 76px 86px;
+  align-items: center;
+  gap: 0.5vw;
+  padding: 0.55vh 0.6vw;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.82rem;
+}
+.board-row.me {
+  background: rgba(240, 195, 106, 0.1);
+  border: 1px solid rgba(240, 195, 106, 0.25);
+}
+.board-row .rank {
+  color: var(--gold);
+  font-weight: 800;
+  text-align: center;
+}
+.board-row .b-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-row .b-points {
+  color: var(--gold);
+  text-align: right;
+  font-weight: 700;
+}
+.board-row .b-record {
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-align: right;
+}
+.board-me {
+  margin-top: 1.2vh;
+  text-align: center;
+  color: var(--gold);
+  font-size: 0.8rem;
+}
+
+/* 观众列表 */
+.spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 1vh 0.8vw;
+}
+.spec-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3vh;
+  padding: 0.8vh 0.3vw;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.72rem;
+  overflow: hidden;
+}
+.spec-cell span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 23vh;
+  transform: translateX(-50%) translateY(10px);
+  z-index: 10000;
+  padding: 0.7em 1.2em;
+  border-radius: 999px;
+  background: rgba(5, 20, 14, 0.88);
+  border: 1px solid rgba(240, 195, 106, 0.35);
+  color: var(--ink);
+  font-size: 0.84rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s;
+  max-width: 80vw;
+  text-align: center;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.rotate-tip {
+  display: none;
+}
+
+/* ---------------- 动画 ---------------- */
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+@keyframes bubbleIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes dealFlash {
+  0% {
+    opacity: 0.2;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes playFlash {
+  0% {
+    filter: brightness(1.6);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translate(-50%, -50%);
+  }
+  20% {
+    transform: translate(calc(-50% - 7px), -50%) rotate(-1deg);
+  }
+  40% {
+    transform: translate(calc(-50% + 6px), -50%) rotate(1deg);
+  }
+  60% {
+    transform: translate(calc(-50% - 4px), -50%);
+  }
+  80% {
+    transform: translate(calc(-50% + 3px), -50%);
+  }
+}
+
+/* ---------------- 响应式 ---------------- */
+
+@media (max-width: 900px) {
+  :root {
+    --card-overlap: 3vw;
+  }
+  .seat-slot {
+    width: 33vw;
+  }
+  .seat-slot.left {
+    left: 1.2vw;
+  }
+  .seat-slot.right {
+    right: 1.2vw;
+  }
+  .seat-card {
+    padding: 1.8vh 1vw 1vh;
+  }
+  .seat-state {
+    font-size: 0.6rem;
+  }
+  .self-seat {
+    width: 28vw;
+    left: 1vw;
+    bottom: 19vh;
+  }
+  .hand-wrap {
+    bottom: 2.6vh;
+    width: 99vw;
+  }
+  .actions {
+    left: 50%;
+    right: auto;
+    bottom: 19vh;
+    transform: translateX(-50%);
+    max-width: 80vw;
+    gap: 0.8vw;
+    justify-content: center;
+  }
+  .btn {
+    padding: 1.05vh 1.65vw;
+    min-width: 87px;
+    font-size: 1.14rem;
+  }
+  .avatar-wrap {
+    width: 48px;
+    height: 48px;
+  }
+  .avatar-wrap.large {
+    width: 54px;
+    height: 54px;
+  }
+  .center {
+    top: 40%;
+    width: 62vw;
+  }
+  .spectator-bar {
+    top: 24vh;
+    padding: 0.25vh 0.6vw;
+  }
+  .spec-label {
+    font-size: 0.62rem;
+  }
+  .chat-panel {
+    width: 28vw;
+    max-width: 260px;
+    bottom: 20.5vh;
+    max-height: 10vh;
+  }
+  .top-hud {
+    top: 5vh;
+  }
+  .table-action.self {
+    bottom: calc(27vh + 4.2vw);
+  }
+  .table-action.left {
+    left: 22vw;
+  }
+  .table-action.right {
+    right: 22vw;
+  }
+}
+
+@media (max-height: 520px) {
+  .topbar {
+    height: 7vh;
+    min-height: 38px;
+  }
+  .opponents {
+    top: 7vh;
+    height: 26vh;
+  }
+  .seat-card {
+    min-height: 10vh;
+  }
+  .seat-state {
+    display: none;
+  }
+  .self-area {
+    height: 40vh;
+  }
+  .hand-wrap {
+    bottom: 2.4vh;
+  }
+  .hand {
+    min-height: 15vh;
+  }
+  .spectator-bar {
+    top: 24.5vh;
+  }
+  .top-hud {
+    top: 4.4vh;
+  }
+  .center {
+    top: 41%;
+  }
+  .actions {
+    bottom: 17.5vh;
+  }
+  .self-seat {
+    bottom: 17.5vh;
+  }
+  .table-action.self {
+    bottom: calc(24vh + 4.2vw);
+  }
+}
+
+@media (orientation: portrait) and (max-width: 900px) {
+  .rotate-tip {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    background: #0b2a1e;
+    color: var(--gold);
+    font-size: 1.2rem;
+    letter-spacing: 0.2em;
+  }
+}
