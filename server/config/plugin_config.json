@@ -10,7 +10,11 @@
   "seatGraceSeconds": 20,
   "allowSpectatorHands": true,
   "initialPoints": 100,
-  "dailyGift": 10,
+  "minPointsToSit": 50,
+  "dailyActiveReward": 10,
+  "rakePercent": 5,
+  "rakeMinProfit": 10,
+  "rakeCap": 30,
   "baseScore": 1,
   "dataDir": "data",
   "boardLimit": 100

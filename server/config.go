@@ -29,7 +29,11 @@ type fileConfig struct {
 	SeatGraceSeconds   int      `json:"seatGraceSeconds"`
 	AllowSpectatorHand *bool    `json:"allowSpectatorHands"`
 	InitialPoints      *int     `json:"initialPoints"`
-	DailyGift          *int     `json:"dailyGift"`
+	MinPointsToSit     *int     `json:"minPointsToSit"`
+	DailyActiveReward  *int     `json:"dailyActiveReward"`
+	RakePercent        *int     `json:"rakePercent"`
+	RakeMinProfit      *int     `json:"rakeMinProfit"`
+	RakeCap            *int     `json:"rakeCap"`
 	BaseScore          int      `json:"baseScore"`
 	DataDir            string   `json:"dataDir"`
 	BoardLimit         int      `json:"boardLimit"`
@@ -40,7 +44,8 @@ func (f fileConfig) isZero() bool {
 	return f.Addr == "" && f.WebRoot == "" && f.InstanceID == "" && f.PublicKeyPath == "" &&
 		f.CountdownSeconds == 0 && f.BidSeconds == 0 && f.DoubleSeconds == 0 && f.TurnSeconds == 0 &&
 		f.SeatGraceSeconds == 0 && f.AllowSpectatorHand == nil && f.InitialPoints == nil &&
-		f.DailyGift == nil && f.BaseScore == 0 && f.DataDir == "" && f.BoardLimit == 0 &&
+		f.MinPointsToSit == nil && f.DailyActiveReward == nil && f.RakePercent == nil &&
+		f.RakeMinProfit == nil && f.RakeCap == nil && f.BaseScore == 0 && f.DataDir == "" && f.BoardLimit == 0 &&
 		len(f.AdminNicks) == 0
 }
 
@@ -66,7 +71,11 @@ type Config struct {
 	// AllowSpectatorHands 房间是否允许观众看牌（默认开）
 	AllowSpectatorHands bool
 	InitialPoints       int
-	DailyGift           int
+	MinPointsToSit      int
+	DailyActiveReward   int
+	RakePercent         int
+	RakeMinProfit       int
+	RakeCap             int
 	BaseScore           int
 	DataDir             string
 	BoardLimit          int

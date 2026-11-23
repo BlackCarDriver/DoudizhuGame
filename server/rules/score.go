@@ -12,12 +12,18 @@ type ScoreInput struct {
 	Doubles        [3]bool
 	Balance        [3]int
 	LandlordWon    bool
+	// 抽水：只对赢家实际正收益抽取，作为积分回收（销毁）。
+	RakePercent   int
+	RakeMinProfit int
+	RakeCap       int
 }
 
 // ScoreOutput 结算结果。
 type ScoreOutput struct {
 	PublicMultiplier int
-	Deltas           [3]int // 每个座位的积分变化，正数赢、负数输
+	Deltas           [3]int // 每个座位的积分变化，正数赢、负数输；已扣除抽水
+	Rake             int    // 本局抽水总额（从赢家扣除，不再分配）
+	Rakes            [3]int // 每个座位被抽走的分数
 }
 
 // Settle 按欢乐斗地主的口径计算输赢：
@@ -86,6 +92,7 @@ func Settle(in ScoreInput) ScoreOutput {
 			total += loss
 		}
 		out.Deltas[in.Landlord] = total
+		applyRake(&out, in)
 		return out
 	}
 
@@ -125,5 +132,41 @@ func Settle(in ScoreInput) ScoreOutput {
 	if remaining > 0 && lastFarmer >= 0 {
 		out.Deltas[lastFarmer] += remaining
 	}
+	applyRake(&out, in)
 	return out
+}
+
+// applyRake 从每个赢家的实际正收益中抽水，输家不变。
+// 抽水是总量回收，因此结算后三家 delta 之和为 -Rake。
+func applyRake(out *ScoreOutput, in ScoreInput) {
+	if in.RakePercent <= 0 {
+		return
+	}
+	percent := in.RakePercent
+	if percent > 100 {
+		percent = 100
+	}
+	minProfit := in.RakeMinProfit
+	if minProfit < 0 {
+		minProfit = 0
+	}
+	for i := 0; i < 3; i++ {
+		profit := out.Deltas[i]
+		if profit <= 0 || profit < minProfit {
+			continue
+		}
+		rake := (profit*percent + 99) / 100
+		if in.RakeCap > 0 && rake > in.RakeCap {
+			rake = in.RakeCap
+		}
+		if rake > profit {
+			rake = profit
+		}
+		if rake <= 0 {
+			continue
+		}
+		out.Deltas[i] -= rake
+		out.Rakes[i] = rake
+		out.Rake += rake
+	}
 }

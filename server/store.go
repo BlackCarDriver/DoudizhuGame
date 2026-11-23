@@ -12,7 +12,8 @@ import (
 
 // 积分存档：沿用梭哈模拟器的本地文本存档方式。
 //   - 一个昵称一条记录，全局共享；
-//   - 每天第一次进入游戏赠送 DailyGift 分；
+//   - 新人首次进入发放启动积分；余额低于上桌门槛时每天补一次救济金；
+//   - 每天完成一局后发一次活跃奖励；
 //   - 输赢在局末一次性写入，进程被 kill 也不会只写一半（临时文件 + rename）。
 //
 // 数据量很小（房间成员 + 历史玩家），不需要数据库。
@@ -20,13 +21,15 @@ import (
 const playersVersion = 1
 
 type PlayerRecord struct {
-	Nick      string `json:"nick"`
-	Avatar    string `json:"avatar"`
-	Points    int    `json:"points"`
-	Wins      int    `json:"wins"`
-	Losses    int    `json:"losses"`
-	LastGift  string `json:"lastGift,omitempty"`
-	UpdatedAt int64  `json:"updatedAt,omitempty"`
+	Nick             string `json:"nick"`
+	Avatar           string `json:"avatar"`
+	Points           int    `json:"points"`
+	Wins             int    `json:"wins"`
+	Losses           int    `json:"losses"`
+	LastRelief       string `json:"lastRelief,omitempty"`
+	LastActiveReward string `json:"lastActiveReward,omitempty"`
+	LastGame         string `json:"lastGame,omitempty"`
+	UpdatedAt        int64  `json:"updatedAt,omitempty"`
 }
 
 type playersData struct {
@@ -35,28 +38,33 @@ type playersData struct {
 }
 
 type Store struct {
-	mu            sync.Mutex
-	path          string
-	data          playersData
-	initialPoints int
-	dailyGift     int
+	mu                sync.Mutex
+	path              string
+	data              playersData
+	initialPoints     int
+	minPointsToSit    int
+	dailyActiveReward int
 }
 
-func NewStore(path string, initialPoints, dailyGift int) *Store {
+func NewStore(path string, initialPoints, minPointsToSit, dailyActiveReward int) *Store {
 	if path == "" {
 		path = filepath.Join("data", "players.json")
 	}
 	if initialPoints < 0 {
 		initialPoints = 0
 	}
-	if dailyGift < 0 {
-		dailyGift = 0
+	if minPointsToSit < 0 {
+		minPointsToSit = 0
+	}
+	if dailyActiveReward < 0 {
+		dailyActiveReward = 0
 	}
 	return &Store{
-		path:          path,
-		data:          playersData{Version: playersVersion, Players: map[string]*PlayerRecord{}},
-		initialPoints: initialPoints,
-		dailyGift:     dailyGift,
+		path:              path,
+		data:              playersData{Version: playersVersion, Players: map[string]*PlayerRecord{}},
+		initialPoints:     initialPoints,
+		minPointsToSit:    minPointsToSit,
+		dailyActiveReward: dailyActiveReward,
 	}
 }
 
@@ -119,7 +127,7 @@ func today() string {
 	return time.Now().In(loc).Format("2006-01-02")
 }
 
-// Touch 玩家进入游戏：创建记录、更新头像、发放每日赠送。返回当前积分。
+// Touch 玩家进入游戏：创建记录、更新头像、检查破产救济。返回当前积分。
 func (s *Store) Touch(nick, avatar string) int {
 	if nick == "" {
 		return 0
@@ -133,17 +141,74 @@ func (s *Store) Touch(nick, avatar string) int {
 		changed = true
 	}
 	day := today()
-	if s.dailyGift > 0 && rec.LastGift != day {
-		rec.Points += s.dailyGift
-		rec.LastGift = day
+	if s.grantReliefLocked(rec, day) {
 		changed = true
-		log.Printf("[store] %s 领取每日赠送 %d 分（当前 %d）", nick, s.dailyGift, rec.Points)
 	}
 	if changed {
 		rec.UpdatedAt = time.Now().Unix()
 		s.writeLocked()
 	}
 	return rec.Points
+}
+
+// ClaimRelief 余额低于最低上桌积分时，每天补到最低上桌积分。
+// 不要求玩家先上桌/先打一局，否则 0 分新人会死锁。
+func (s *Store) ClaimRelief(nick string) (int, bool) {
+	if nick == "" {
+		return 0, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rec := s.ensureLocked(nick, "")
+	day := today()
+	before := rec.Points
+	if !s.grantReliefLocked(rec, day) {
+		return 0, false
+	}
+	rec.UpdatedAt = time.Now().Unix()
+	s.writeLocked()
+	return rec.Points - before, true
+}
+
+// ClaimActiveReward 当天完成过至少一局，且余额达到最低上桌积分时发放一次。
+func (s *Store) ClaimActiveReward(nick string) (int, bool) {
+	if nick == "" {
+		return 0, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rec := s.ensureLocked(nick, "")
+	day := today()
+	if !s.grantActiveRewardLocked(rec, day) {
+		return 0, false
+	}
+	rec.UpdatedAt = time.Now().Unix()
+	s.writeLocked()
+	return s.dailyActiveReward, true
+}
+
+func (s *Store) grantReliefLocked(rec *PlayerRecord, day string) bool {
+	if s.minPointsToSit <= 0 || rec.Points >= s.minPointsToSit || rec.LastRelief == day {
+		return false
+	}
+	before := rec.Points
+	rec.Points = s.minPointsToSit
+	rec.LastRelief = day
+	log.Printf("[store] %s 领取破产救济 %d 分（%d → %d）", rec.Nick, rec.Points-before, before, rec.Points)
+	return true
+}
+
+func (s *Store) grantActiveRewardLocked(rec *PlayerRecord, day string) bool {
+	if s.dailyActiveReward <= 0 || rec.LastGame != day || rec.LastActiveReward == day {
+		return false
+	}
+	if rec.Points < s.minPointsToSit {
+		return false
+	}
+	rec.Points += s.dailyActiveReward
+	rec.LastActiveReward = day
+	log.Printf("[store] %s 领取每日活跃奖励 %d 分（当前 %d）", rec.Nick, s.dailyActiveReward, rec.Points)
+	return true
 }
 
 // Points 查询积分（不发放赠送，不写盘）。
@@ -181,6 +246,7 @@ func (s *Store) ApplyResult(deltas map[string]int, win map[string]bool, avatars 
 		} else {
 			rec.Losses++
 		}
+		rec.LastGame = today()
 		rec.UpdatedAt = time.Now().Unix()
 		changed = true
 	}

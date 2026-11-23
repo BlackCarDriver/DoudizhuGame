@@ -23,13 +23,15 @@ type ActionInfo struct {
 }
 
 type PlayerResult struct {
-	Seat   string `json:"seat"`
-	Nick   string `json:"nick"`
-	Avatar string `json:"avatar"`
-	Role   string `json:"role"`
-	Double bool   `json:"double"`
-	Delta  int    `json:"delta"`
-	Points int    `json:"points"`
+	Seat       string `json:"seat"`
+	Nick       string `json:"nick"`
+	Avatar     string `json:"avatar"`
+	Role       string `json:"role"`
+	Double     bool   `json:"double"`
+	Delta      int    `json:"delta"`
+	Points     int    `json:"points"`
+	Rake       int    `json:"rake,omitempty"`
+	DailyBonus int    `json:"dailyBonus,omitempty"`
 }
 
 type ResultInfo struct {
@@ -41,6 +43,7 @@ type ResultInfo struct {
 	RobMultiplier    int            `json:"robMultiplier"`
 	PublicMultiplier int            `json:"publicMultiplier"`
 	Base             int            `json:"base"`
+	Rake             int            `json:"rake,omitempty"`
 	Players          []PlayerResult `json:"players"`
 	Reason           string         `json:"reason"`
 }
@@ -109,6 +112,26 @@ func (h *Hub) controlledSeatLocked(nick string) int {
 	return -1
 }
 
+func (h *Hub) ensureMinPointsLocked(nick string) (int, string) {
+	points := h.store.Points(nick)
+	if h.cfg.MinPointsToSit <= 0 || points >= h.cfg.MinPointsToSit {
+		return points, ""
+	}
+	if amount, ok := h.store.ClaimRelief(nick); ok {
+		log.Printf("[hub] %s 领取救济 +%d，当前 %d", nick, amount, h.store.Points(nick))
+		points = h.store.Points(nick)
+	} else {
+		return points, "积分不足，今日救济已领"
+	}
+	// 如果今天已经打过一局，但结算时余额不足没发活跃奖励，
+	// 领取救济后余额达标，可以在这里补发一次。
+	if bonus, ok := h.store.ClaimActiveReward(nick); ok {
+		log.Printf("[hub] %s 补发每日活跃奖励 +%d", nick, bonus)
+		points = h.store.Points(nick)
+	}
+	return points, ""
+}
+
 func (h *Hub) sitAt(nick, want string) string {
 	h.lock.Lock()
 	if h.closed {
@@ -156,8 +179,13 @@ func (h *Hub) sitAt(nick, want string) string {
 		h.lock.Unlock()
 		return "这个座位已经有人了"
 	}
+	points, minErr := h.ensureMinPointsLocked(nick)
+	if minErr != "" {
+		h.lock.Unlock()
+		return minErr
+	}
 	c := h.clients[nick]
-	info := SeatInfo{Nick: nick, Connected: true, Points: h.store.Points(nick)}
+	info := SeatInfo{Nick: nick, Connected: true, Points: points}
 	if c != nil {
 		info.Avatar, info.Frame, info.RoleID = c.avatar, c.frame, c.roleID
 	}
@@ -240,6 +268,14 @@ func (h *Hub) setReady(nick string, ready bool) string {
 	if h.match != nil && h.match.Phase != "over" && h.match.Phase != "countdown" {
 		h.lock.Unlock()
 		return "本局还没结束"
+	}
+	if ready {
+		points, minErr := h.ensureMinPointsLocked(nick)
+		if minErr != "" {
+			h.lock.Unlock()
+			return minErr
+		}
+		h.seats[seat].Points = points
 	}
 	h.ready[seat] = ready
 	if !ready && h.match != nil && h.match.Phase == "countdown" {
@@ -432,6 +468,10 @@ func (h *Hub) bidLocked(seat int, action string) string {
 		if action == "call" {
 			m.Caller = seat
 			m.Landlord = seat
+			// 进入抢地主阶段后，清掉叫地主阶段的“不叫”状态，
+			// 否则还没轮到抢的人会提前显示成“不抢”。
+			m.BidActions = [3]string{}
+			m.BidActions[seat] = "call"
 			m.BidStage = "rob"
 			m.RobCount = 0
 			m.FinalChance = false
@@ -449,7 +489,8 @@ func (h *Hub) bidLocked(seat int, action string) string {
 		}
 		if passes >= 3 {
 			m.RedealCount++
-			if m.RedealCount > 3 {
+			// 连续 3 次无人叫地主后，随机指定地主；第 3 次流局就应该结束叫抢。
+			if m.RedealCount >= 3 {
 				m.Landlord = rand.Intn(3)
 				m.Caller = m.Landlord
 				m.RobMultiplier = 1
@@ -488,7 +529,9 @@ func (h *Hub) bidLocked(seat int, action string) string {
 			return ""
 		}
 		if len(m.RobQueue) == 0 {
-			if m.RobCount == 2 && !m.FinalChance {
+			// 只要有人抢过地主，原叫地主者就有一次反抢机会；
+			// 之前只在另外两家都抢时才给反抢，只有一家抢会直接结束。
+			if m.RobCount > 0 && !m.FinalChance {
 				m.FinalChance = true
 				m.RobQueue = []int{m.Caller}
 			} else {
@@ -856,6 +899,9 @@ func (h *Hub) finishRoundLocked(winnerSeat int) {
 		Doubles:        m.Double,
 		Balance:        balances,
 		LandlordWon:    landlordWon,
+		RakePercent:    h.cfg.RakePercent,
+		RakeMinProfit:  h.cfg.RakeMinProfit,
+		RakeCap:        h.cfg.RakeCap,
 	})
 
 	deltas := map[string]int{}
@@ -881,10 +927,27 @@ func (h *Hub) finishRoundLocked(winnerSeat int) {
 		avatars[h.seats[i].Nick] = h.seats[i].Avatar
 		players = append(players, PlayerResult{
 			Seat: seatAt(i), Nick: h.seats[i].Nick, Avatar: h.seats[i].Avatar,
-			Role: role, Double: m.Double[i], Delta: out.Deltas[i], Points: np,
+			Role: role, Double: m.Double[i], Delta: out.Deltas[i], Points: np, Rake: out.Rakes[i],
 		})
 	}
 	h.store.ApplyResult(deltas, win, avatars)
+
+	// 每日活跃奖励：当天完成过一局且余额达到最低上桌积分，自动发放一次。
+	for i := 0; i < 3; i++ {
+		if h.seats[i].Nick == "" {
+			continue
+		}
+		if bonus, ok := h.store.ClaimActiveReward(h.seats[i].Nick); ok {
+			h.seats[i].Points = h.store.Points(h.seats[i].Nick)
+			for j := range players {
+				if players[j].Seat == seatAt(i) {
+					players[j].Points = h.seats[i].Points
+					players[j].DailyBonus = bonus
+					break
+				}
+			}
+		}
+	}
 
 	if m.Timer != nil {
 		m.Timer.Stop()
@@ -898,11 +961,14 @@ func (h *Hub) finishRoundLocked(winnerSeat int) {
 	if landlordWon {
 		m.WinnerSide = "landlord"
 	}
+	if out.Rake > 0 {
+		log.Printf("[match #%d] 抽水 %d 分（赢家正收益 %d%%）", m.ID, out.Rake, h.cfg.RakePercent)
+	}
 	m.Result = &ResultInfo{
 		WinnerSide: m.WinnerSide, Landlord: seatAt(m.Landlord),
 		Spring: spring, AntiSpring: antiSpring, BombCount: m.BombCount,
 		RobMultiplier: m.RobMultiplier, PublicMultiplier: out.PublicMultiplier,
-		Base: h.cfg.BaseScore, Players: players, Reason: "normal",
+		Base: h.cfg.BaseScore, Rake: out.Rake, Players: players, Reason: "normal",
 	}
 	for i := 0; i < 3; i++ {
 		h.ready[i] = false

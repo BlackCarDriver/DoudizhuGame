@@ -25,12 +25,14 @@ func newTestHub(t *testing.T) *Hub {
 		SeatGraceSeconds:    30,
 		AllowSpectatorHands: true,
 		InitialPoints:       100,
-		DailyGift:           0,
+		MinPointsToSit:      50,
+		DailyActiveReward:   0,
+		RakePercent:         0,
 		BaseScore:           1,
 		DataDir:             dir,
 		BoardLimit:          100,
 	}
-	store := NewStore(filepath.Join(dir, "players.json"), cfg.InitialPoints, cfg.DailyGift)
+	store := NewStore(filepath.Join(dir, "players.json"), cfg.InitialPoints, cfg.MinPointsToSit, cfg.DailyActiveReward)
 	if err := store.Load(); err != nil {
 		t.Fatal(err)
 	}
@@ -527,5 +529,214 @@ func TestMatchViewCanBeat(t *testing.T) {
 	h.lock.Unlock()
 	if view["canBeat"] != true {
 		t.Fatal("手里有 4，能压单 3，canBeat 应为 true")
+	}
+}
+
+func TestCallerGetsFinalChanceAfterOneRob(t *testing.T) {
+	h := newTestHub(t)
+	startGame(t, h)
+
+	h.lock.Lock()
+	caller := h.match.BidTurn
+	callerNick := h.seats[caller].Nick
+	h.lock.Unlock()
+	if err := h.bid(callerNick, "call"); err != "" {
+		t.Fatalf("call: %s", err)
+	}
+
+	h.lock.Lock()
+	firstRobber := h.match.BidTurn
+	firstRobberNick := h.seats[firstRobber].Nick
+	h.lock.Unlock()
+	if err := h.bid(firstRobberNick, "rob"); err != "" {
+		t.Fatalf("first rob: %s", err)
+	}
+
+	h.lock.Lock()
+	secondNick := h.seats[h.match.BidTurn].Nick
+	h.lock.Unlock()
+	if err := h.bid(secondNick, "pass"); err != "" {
+		t.Fatalf("second pass: %s", err)
+	}
+
+	h.lock.Lock()
+	ok := h.match.Phase == "bidding" && h.match.BidStage == "rob" && h.match.BidTurn == caller
+	phase, stage, turn := h.match.Phase, h.match.BidStage, h.match.BidTurn
+	h.lock.Unlock()
+	if !ok {
+		t.Fatalf("只有一家抢地主后，应回到原叫地主者反抢，phase=%s stage=%s turn=%d caller=%d", phase, stage, turn, caller)
+	}
+
+	if err := h.bid(callerNick, "rob"); err != "" {
+		t.Fatalf("caller final rob: %s", err)
+	}
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	if h.match.Phase != "doubling" {
+		t.Fatalf("原叫地主者反抢后应进入 doubling，得到 %s", h.match.Phase)
+	}
+	if h.match.Landlord != caller {
+		t.Fatalf("原叫地主者反抢后应成为地主，得到 %d", h.match.Landlord)
+	}
+	if h.match.RobMultiplier != 4 {
+		t.Fatalf("一家抢 + 原叫地主者反抢，倍数应为 4，得到 %d", h.match.RobMultiplier)
+	}
+	if got := len(h.match.Hands[caller]); got != 20 {
+		t.Fatalf("地主拿底牌后应有 20 张，得到 %d", got)
+	}
+}
+
+func TestCallPassStatusClearedWhenRobStarts(t *testing.T) {
+	h := newTestHub(t)
+	startGame(t, h)
+
+	h.lock.Lock()
+	first := h.match.BidTurn
+	firstNick := h.seats[first].Nick
+	h.lock.Unlock()
+	if err := h.bid(firstNick, "pass"); err != "" {
+		t.Fatalf("first pass: %s", err)
+	}
+
+	h.lock.Lock()
+	caller := h.match.BidTurn
+	callerNick := h.seats[caller].Nick
+	h.lock.Unlock()
+	if err := h.bid(callerNick, "call"); err != "" {
+		t.Fatalf("call: %s", err)
+	}
+
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	if h.match.BidStage != "rob" {
+		t.Fatalf("叫地主后应进入抢地主，得到 %s", h.match.BidStage)
+	}
+	if h.match.BidActions[first] != "" {
+		t.Fatalf("叫地主阶段的不叫状态不应带到抢地主阶段，得到 %q", h.match.BidActions[first])
+	}
+	if h.match.BidActions[caller] != "call" {
+		t.Fatalf("原叫地主者应保留叫地主标记，得到 %q", h.match.BidActions[caller])
+	}
+}
+
+func TestRedealAfterThreeNoCalls(t *testing.T) {
+	h := newTestHub(t)
+	startGame(t, h)
+
+	for round := 0; round < 3; round++ {
+		for i := 0; i < 3; i++ {
+			h.lock.Lock()
+			if h.match == nil || h.match.Phase != "bidding" {
+				phase := ""
+				if h.match != nil {
+					phase = h.match.Phase
+				}
+				h.lock.Unlock()
+				t.Fatalf("第 %d 轮第 %d 次叫地主前阶段异常：%s", round+1, i+1, phase)
+			}
+			nick := h.seats[h.match.BidTurn].Nick
+			h.lock.Unlock()
+			if err := h.bid(nick, "pass"); err != "" {
+				t.Fatalf("第 %d 轮第 %d 次 pass：%s", round+1, i+1, err)
+			}
+		}
+	}
+
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	if h.match.Phase != "doubling" {
+		t.Fatalf("连续 3 次流局后应随机指定地主并进入 doubling，得到 %s", h.match.Phase)
+	}
+	if h.match.Landlord < 0 {
+		t.Fatal("随机指定地主失败")
+	}
+	if h.match.RobMultiplier != 1 {
+		t.Fatalf("流局指定地主时倍数应为 1，得到 %d", h.match.RobMultiplier)
+	}
+	if got := len(h.match.Hands[h.match.Landlord]); got != 20 {
+		t.Fatalf("地主拿底牌后应有 20 张，得到 %d", got)
+	}
+}
+
+func TestSitAutoGrantsRelief(t *testing.T) {
+	h := newTestHub(t)
+	h.store.ApplyResult(
+		map[string]int{"alice": -100},
+		map[string]bool{"alice": false},
+		map[string]string{"alice": ""},
+	)
+	if err := h.sitAt("alice", "a"); err != "" {
+		t.Fatalf("余额不足时上桌应自动领取救济，得到 %s", err)
+	}
+	h.lock.Lock()
+	seat := h.seatOfNickLocked("alice")
+	points := h.seats[seat].Points
+	h.lock.Unlock()
+	if seat != 0 || points != 50 {
+		t.Fatalf("应自动补到 50 后坐在 a，得到 seat=%d points=%d", seat, points)
+	}
+}
+
+func TestReadyAutoGrantsRelief(t *testing.T) {
+	h := newTestHub(t)
+	if err := h.sitAt("alice", "a"); err != "" {
+		t.Fatalf("sit: %s", err)
+	}
+	h.store.ApplyResult(
+		map[string]int{"alice": -100},
+		map[string]bool{"alice": false},
+		map[string]string{"alice": ""},
+	)
+	if err := h.setReady("alice", true); err != "" {
+		t.Fatalf("准备时应自动领取救济，得到 %s", err)
+	}
+	h.lock.Lock()
+	seat := h.seatOfNickLocked("alice")
+	points := h.seats[seat].Points
+	ready := h.ready[seat]
+	h.lock.Unlock()
+	if points != 50 || !ready {
+		t.Fatalf("应补到 50 且已准备，得到 points=%d ready=%v", points, ready)
+	}
+}
+
+func TestSettleAppliesRakeAndDailyBonus(t *testing.T) {
+	h := newTestHub(t)
+	h.cfg.RakePercent = 5
+	h.cfg.RakeMinProfit = 10
+	h.cfg.RakeCap = 30
+	h.store.dailyActiveReward = 10
+	startGame(t, h)
+	bidFirstCallThenAllRob(t, h)
+	doubleAll(t, h)
+
+	h.lock.Lock()
+	landlord := h.match.Landlord
+	landlordNick := h.seats[landlord].Nick
+	card := h.match.Hands[landlord][0]
+	h.match.Hands[landlord] = []rules.Card{card}
+	h.lock.Unlock()
+
+	if err := h.play(landlordNick, []int{card.ID}); err != "" {
+		t.Fatalf("地主出最后一张失败：%s", err)
+	}
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	if h.match.Result == nil {
+		t.Fatal("缺少结算结果")
+	}
+	r := h.match.Result
+	if r.Rake != 7 {
+		t.Fatalf("地主赢 128 抽 5%% 应为 7，得到 %d", r.Rake)
+	}
+	for _, p := range r.Players {
+		if p.Seat == seatAt(landlord) {
+			if p.Delta != 121 {
+				t.Fatalf("地主扣除抽水后应为 +121，得到 %+v", p)
+			}
+			if p.DailyBonus != 10 || p.Points != 231 {
+				t.Fatalf("地主活跃奖励/最终积分错误：%+v", p)
+			}
+		}
 	}
 }

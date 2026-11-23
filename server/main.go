@@ -55,8 +55,12 @@ func main() {
 	flag.IntVar(&cfg.TurnSeconds, "turn-seconds", pickInt(fileCfg.TurnSeconds, "TURN_SECONDS", 30), "每手出牌时间（秒）")
 	flag.IntVar(&cfg.SeatGraceSeconds, "seat-grace-seconds", pickInt(fileCfg.SeatGraceSeconds, "SEAT_GRACE_SECONDS", 20), "掉线保留座位宽限期（秒）")
 	flag.BoolVar(&cfg.AllowSpectatorHands, "allow-spectator-hands", pickBool(fileCfg.AllowSpectatorHand, "ALLOW_SPECTATOR_HANDS", true), "是否允许观众看牌（默认开）")
-	flag.IntVar(&cfg.InitialPoints, "initial-points", pickIntPtr(fileCfg.InitialPoints, "INITIAL_POINTS", 100), "新玩家初始积分")
-	flag.IntVar(&cfg.DailyGift, "daily-gift", pickIntPtr(fileCfg.DailyGift, "DAILY_GIFT", 10), "每日首次进入赠送积分")
+	flag.IntVar(&cfg.InitialPoints, "initial-points", pickIntPtr(fileCfg.InitialPoints, "INITIAL_POINTS", 100), "新玩家首次进入的启动积分")
+	flag.IntVar(&cfg.MinPointsToSit, "min-points-to-sit", pickIntPtr(fileCfg.MinPointsToSit, "MIN_POINTS_TO_SIT", 50), "最低上桌积分，同时也是破产救济目标")
+	flag.IntVar(&cfg.DailyActiveReward, "daily-active-reward", pickIntPtr(fileCfg.DailyActiveReward, "DAILY_ACTIVE_REWARD", 10), "每日完成至少一局后的活跃奖励")
+	flag.IntVar(&cfg.RakePercent, "rake-percent", pickIntPtr(fileCfg.RakePercent, "RAKE_PERCENT", 5), "赢家正收益抽水百分比")
+	flag.IntVar(&cfg.RakeMinProfit, "rake-min-profit", pickIntPtr(fileCfg.RakeMinProfit, "RAKE_MIN_PROFIT", 10), "低于该利润不抽水")
+	flag.IntVar(&cfg.RakeCap, "rake-cap", pickIntPtr(fileCfg.RakeCap, "RAKE_CAP", 30), "单个赢家单局抽水上限")
 	flag.IntVar(&cfg.BaseScore, "base-score", pickInt(fileCfg.BaseScore, "BASE_SCORE", 1), "底分")
 	flag.StringVar(&cfg.DataDir, "data-dir", pickString(fileCfg.DataDir, "DATA_DIR", "data"), "本地存档目录（players.json）")
 	flag.IntVar(&cfg.BoardLimit, "board-limit", pickInt(fileCfg.BoardLimit, "BOARD_LIMIT", 100), "排行榜返回条数")
@@ -79,6 +83,27 @@ func main() {
 	}
 	if cfg.TurnSeconds < 1 {
 		cfg.TurnSeconds = 1
+	}
+	if cfg.InitialPoints < 0 {
+		cfg.InitialPoints = 0
+	}
+	if cfg.MinPointsToSit < 0 {
+		cfg.MinPointsToSit = 0
+	}
+	if cfg.DailyActiveReward < 0 {
+		cfg.DailyActiveReward = 0
+	}
+	if cfg.RakePercent < 0 {
+		cfg.RakePercent = 0
+	}
+	if cfg.RakePercent > 100 {
+		cfg.RakePercent = 100
+	}
+	if cfg.RakeMinProfit < 0 {
+		cfg.RakeMinProfit = 0
+	}
+	if cfg.RakeCap < 0 {
+		cfg.RakeCap = 0
 	}
 	if cfg.SeatGraceSeconds < 1 {
 		cfg.SeatGraceSeconds = 20
@@ -109,7 +134,7 @@ func main() {
 	}
 	cfg.PublicKey = pub
 
-	store := NewStore(filepath.Join(cfg.DataDir, "players.json"), cfg.InitialPoints, cfg.DailyGift)
+	store := NewStore(filepath.Join(cfg.DataDir, "players.json"), cfg.InitialPoints, cfg.MinPointsToSit, cfg.DailyActiveReward)
 	if err := store.Load(); err != nil {
 		log.Printf("[start] 读取积分存档失败（从空档开始）：%v", err)
 	}
@@ -163,6 +188,8 @@ func main() {
 	} else {
 		log.Printf("斗地主服务启动于 %s（页面模式：可打开页面，但无法取得游戏身份）", cfg.Addr)
 	}
+	log.Printf("  经济：初始 %d / 上桌 %d / 活跃奖励 %d / 抽水 %d%%（利润≥%d，上限%d）",
+		cfg.InitialPoints, cfg.MinPointsToSit, cfg.DailyActiveReward, cfg.RakePercent, cfg.RakeMinProfit, cfg.RakeCap)
 	log.Printf("  单局：叫抢 %d 秒 / 加倍 %d 秒 / 出牌 %d 秒 / 断线宽限 %d 秒 / 观众看牌 %v",
 		cfg.BidSeconds, cfg.DoubleSeconds, cfg.TurnSeconds, cfg.SeatGraceSeconds, cfg.AllowSpectatorHands)
 	log.Printf("  页面目录 %s · 积分存档 %s", absWeb, filepath.Join(cfg.DataDir, "players.json"))

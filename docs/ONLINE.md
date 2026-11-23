@@ -129,10 +129,11 @@
   "robMultiplier": 2,
   "publicMultiplier": 8,
   "base": 1,
+  "rake": 3,
   "players": [
     { "seat": "a", "nick": "alice", "avatar": "https://...", "role": "farmer", "double": false, "delta": -8, "points": 92 },
     { "seat": "b", "nick": "bob", "avatar": "https://...", "role": "farmer", "double": true, "delta": -16, "points": 84 },
-    { "seat": "c", "nick": "carol", "avatar": "https://...", "role": "landlord", "double": false, "delta": 24, "points": 124 }
+    { "seat": "c", "nick": "carol", "avatar": "https://...", "role": "landlord", "double": false, "delta": 21, "points": 121 }
   ],
   "reason": "normal"
 }
@@ -288,7 +289,7 @@ DoudizhuGame/
 │   ├── hub.go           # 房间、连接、快照、广播、聊天、头像白名单
 │   ├── match.go         # 发牌、叫抢、加倍、出牌、计时、结算
 │   ├── ws.go            # JWT、WebSocket、API、头像代理
-│   ├── store.go         # 积分存档、每日赠送、排行榜
+│   ├── store.go         # 积分存档、救济/活跃奖励、排行榜
 │   ├── rules/           # 纯规则引擎：牌、牌型、比较、提示、结算
 │   ├── config/          # integration.json / plugin_config.json / 公钥
 │   └── shell/           # build.sh / run.sh / stop.sh

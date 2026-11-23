@@ -6,28 +6,38 @@ import (
 	"testing"
 )
 
-func TestStoreDailyGiftOnlyOnce(t *testing.T) {
+func TestStoreStarterReliefAndActiveReward(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "players.json")
-	s := NewStore(path, 100, 10)
+	s := NewStore(path, 100, 50, 10)
 	if err := s.Load(); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.Touch("alice", "a.png"); got != 110 {
-		t.Fatalf("首次进入应 100+10=110，得到 %d", got)
+	if got := s.Touch("alice", "a.png"); got != 100 {
+		t.Fatalf("新人首次进入应只有启动金 100，得到 %d", got)
 	}
-	if got := s.Touch("alice", "a.png"); got != 110 {
-		t.Fatalf("同一天第二次进入不应重复赠送，得到 %d", got)
+	s.ApplyResult(map[string]int{"alice": -100}, map[string]bool{"alice": false}, map[string]string{"alice": "a.png"})
+	if got := s.Points("alice"); got != 0 {
+		t.Fatalf("输光后应为 0，得到 %d", got)
 	}
-	if got := s.Points("alice"); got != 110 {
-		t.Fatalf("Points 应为 110，得到 %d", got)
+	if got, ok := s.ClaimActiveReward("alice"); ok || got != 0 {
+		t.Fatalf("余额低于上桌门槛时不应发活跃奖励，得到 %d/%v", got, ok)
+	}
+	if got, ok := s.ClaimRelief("alice"); !ok || got != 50 {
+		t.Fatalf("破产救济应补到 50，得到 %d/%v", got, ok)
+	}
+	if got, ok := s.ClaimRelief("alice"); ok || got != 0 {
+		t.Fatalf("同一天第二次不应再领救济，得到 %d/%v", got, ok)
+	}
+	if got := s.Points("alice"); got != 50 {
+		t.Fatalf("救济后应为 50，得到 %d", got)
 	}
 }
 
 func TestStoreApplyResultAndReload(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "players.json")
-	s := NewStore(path, 100, 0)
+	s := NewStore(path, 100, 50, 0)
 	if err := s.Load(); err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +55,7 @@ func TestStoreApplyResultAndReload(t *testing.T) {
 		t.Fatalf("bob 应 94，得到 %d", got)
 	}
 
-	s2 := NewStore(path, 100, 0)
+	s2 := NewStore(path, 100, 50, 0)
 	if err := s2.Load(); err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +69,7 @@ func TestStoreApplyResultAndReload(t *testing.T) {
 
 func TestStoreSnapshotOrder(t *testing.T) {
 	dir := t.TempDir()
-	s := NewStore(filepath.Join(dir, "players.json"), 0, 0)
+	s := NewStore(filepath.Join(dir, "players.json"), 0, 0, 0)
 	if err := s.Load(); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +94,7 @@ func TestStoreCorruptFileStartsEmpty(t *testing.T) {
 	if err := os.WriteFile(path, []byte("{not-json"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := NewStore(path, 100, 0)
+	s := NewStore(path, 100, 50, 0)
 	if err := s.Load(); err != nil {
 		t.Fatal(err)
 	}
@@ -103,11 +113,31 @@ func TestStoreRecoversFromBackup(t *testing.T) {
 	if err := os.WriteFile(path+".bak", []byte(bak), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := NewStore(path, 100, 0)
+	s := NewStore(path, 100, 50, 0)
 	if err := s.Load(); err != nil {
 		t.Fatal(err)
 	}
 	if got := s.Points("alice"); got != 77 {
 		t.Fatalf("应从 .bak 恢复 alice=77，得到 %d", got)
+	}
+}
+
+func TestStoreActiveRewardOncePerDay(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "players.json")
+	s := NewStore(path, 100, 50, 10)
+	if err := s.Load(); err != nil {
+		t.Fatal(err)
+	}
+	s.Touch("alice", "a.png")
+	s.ApplyResult(map[string]int{"alice": 0}, map[string]bool{"alice": true}, map[string]string{"alice": "a.png"})
+	if got, ok := s.ClaimActiveReward("alice"); !ok || got != 10 {
+		t.Fatalf("当天完成一局后应发活跃奖励 10，得到 %d/%v", got, ok)
+	}
+	if got, ok := s.ClaimActiveReward("alice"); ok || got != 0 {
+		t.Fatalf("同一天不应重复发活跃奖励，得到 %d/%v", got, ok)
+	}
+	if got := s.Points("alice"); got != 110 {
+		t.Fatalf("活跃奖励后应为 110，得到 %d", got)
 	}
 }

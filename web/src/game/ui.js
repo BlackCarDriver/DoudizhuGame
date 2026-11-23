@@ -45,6 +45,9 @@ export class UI {
     this.showSpectators = false
     this.board = null
     this.boardLoading = false
+    this.modalHTML = ''
+    this.modalToken = ''
+
     this.fxClass = ''
     this.lastTickSecond = -1
     this.lastBubbleCheck = 0
@@ -60,6 +63,7 @@ export class UI {
     if (this.mounted) return
     this.mounted = true
     this.app.innerHTML = `
+      <div class="game-rotator" id="game-rotator">
       <div class="game" id="game">
         <div class="felt"></div>
         <div class="felt-glow"></div>
@@ -105,7 +109,19 @@ export class UI {
         <div class="toast" id="toast"></div>
         <div class="rotate-tip">请横屏使用</div>
       </div>
+      </div>
     `
+    this.modalHTML = ''
+    this.modalToken = ''
+    this._onViewportChange = () => this.syncOrientation()
+    window.addEventListener('resize', this._onViewportChange)
+    window.addEventListener('orientationchange', this._onViewportChange)
+    window.visualViewport?.addEventListener('resize', this._onViewportChange)
+    if (typeof ResizeObserver !== 'undefined') {
+      this._viewportObserver = new ResizeObserver(() => this.syncOrientation())
+      this._viewportObserver.observe(this.app)
+    }
+    this.syncOrientation()
     this.app.addEventListener('click', (e) => this._click(e))
     this.app.addEventListener('change', (e) => {
       const cb = e.target.closest?.('[data-vote-spectator]')
@@ -117,6 +133,14 @@ export class UI {
     }, { once: true })
     this.app.querySelector('#hand')?.addEventListener('pointerdown', (e) => this._onHandPointerDown(e))
     window.addEventListener('keydown', this._onKey)
+  }
+
+  // 竖屏 iframe 内使用虚拟横屏坐标系：整个游戏层旋转 90 度。
+  // 外壳保持锁定竖屏，不再依赖浏览器/宿主把页面旋转成横屏。
+  syncOrientation() {
+    if (!this.mounted) return
+    const portrait = window.innerHeight > window.innerWidth
+    this.app.classList.toggle('portrait-rotated', portrait)
   }
 
   // ============================================================
@@ -1022,6 +1046,12 @@ export class UI {
     }
     if (this.showBoard) html += this.boardModalHTML()
     if (this.showSpectators) html += this.spectatorsModalHTML()
+    // 状态/聊天刷新会频繁触发 render；弹窗内容没变时不要重建 DOM，
+    // 否则 fadeIn 动画和头像图片会反复重载，表现为频闪。
+    const token = this.online.shell.token || ''
+    if (html === this.modalHTML && token === this.modalToken) return
+    this.modalHTML = html
+    this.modalToken = token
     root.innerHTML = html
   }
 
@@ -1034,7 +1064,7 @@ export class UI {
     const rows = (r.players || [])
       .map(
         (p) => `<div class="result-row ${p.seat === mySeat ? 'me' : ''}">
-          <span class="rr-name"><span class="rr-nick">${escapeHTML(p.nick)}</span><span class="rr-role ${p.role}">${roleText(p.role)}</span>${p.double ? '<small>加倍</small>' : ''}</span>
+          <span class="rr-name"><span class="rr-nick">${escapeHTML(p.nick)}</span><span class="rr-role ${p.role}">${roleText(p.role)}</span>${p.double ? '<small>加倍</small>' : ''}${p.dailyBonus ? `<small>活跃+${p.dailyBonus}</small>` : ''}</span>
           <span class="rr-delta ${p.delta >= 0 ? 'up' : 'down'}">${fmtDelta(p.delta)}</span>
           <span class="rr-points">${p.points} 分</span>
         </div>`,
@@ -1048,6 +1078,7 @@ export class UI {
         <div class="result-sub">公共倍数 <b>x${r.publicMultiplier}</b></div>
         <div class="mult-breakdown">
           <span>底分 ${r.base}</span><span>抢地主 x${r.robMultiplier}</span><span>炸弹 ${r.bombCount}</span>
+          ${r.rake ? `<span>抽水 -${r.rake}</span>` : ''}
           ${r.spring ? '<span class="hot">春天 x2</span>' : ''}${r.antiSpring ? '<span class="hot">反春 x2</span>' : ''}
         </div>
         <div class="result-rows">${rows}</div>

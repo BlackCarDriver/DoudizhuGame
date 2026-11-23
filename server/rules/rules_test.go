@@ -237,3 +237,40 @@ func TestSettleZeroSum(t *testing.T) {
 		}
 	}
 }
+
+func TestSettleRakeOnlyWinners(t *testing.T) {
+	out := Settle(ScoreInput{
+		Base: 5, RobMultiplier: 1, Landlord: 0, LandlordWon: true,
+		Balance:       [3]int{100, 100, 100},
+		RakePercent:   5,
+		RakeMinProfit: 10,
+		RakeCap:       30,
+	})
+	// 地主赢 10，抽 5% 向上取整 = 1；两个农民各输 5。
+	if out.Deltas != [3]int{9, -5, -5} {
+		t.Fatalf("抽水后地主应为 +9，农民 -5，得到 %+v", out.Deltas)
+	}
+	if out.Rake != 1 || out.Rakes[0] != 1 || out.Rakes[1] != 0 {
+		t.Fatalf("抽水明细错误：rake=%d rakes=%+v", out.Rake, out.Rakes)
+	}
+}
+
+func TestSettleRakeThresholdAndCap(t *testing.T) {
+	low := Settle(ScoreInput{
+		Base: 1, RobMultiplier: 1, Landlord: 0, LandlordWon: true,
+		Balance: [3]int{100, 100, 100}, RakePercent: 5, RakeMinProfit: 10,
+	})
+	if low.Rake != 0 || low.Deltas != [3]int{2, -1, -1} {
+		t.Fatalf("低于抽水门槛不应抽水，得到 rake=%d deltas=%+v", low.Rake, low.Deltas)
+	}
+	capped := Settle(ScoreInput{
+		Base: 1000, RobMultiplier: 1, Landlord: 0, LandlordWon: true,
+		Balance: [3]int{100000, 100000, 100000}, RakePercent: 5, RakeMinProfit: 10, RakeCap: 30,
+	})
+	if capped.Rake != 30 {
+		t.Fatalf("抽水上限应为 30，得到 %d", capped.Rake)
+	}
+	if capped.Deltas[0] != 2000-30 {
+		t.Fatalf("地主应扣除 30 抽水，得到 %+v", capped.Deltas)
+	}
+}

@@ -35,11 +35,15 @@ function cardSVG(rank, suit) {
   <defs><filter id="s" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity=".18"/></filter></defs>
   <rect x="3" y="3" width="154" height="218" rx="14" fill="#fdfdfb" stroke="#cfc7b8" stroke-width="2" filter="url(#s)"/>
   <rect x="9" y="9" width="142" height="206" rx="10" fill="none" stroke="#ece5d8"/>
-  <text x="8" y="72" font-family="Arial, Helvetica, sans-serif" font-size="${topSize}" font-weight="800" fill="${color}">${label}</text>
+  <g transform="translate(8 0) scale(0.86 1)">
+    <text x="0" y="72" font-family="Arial, Helvetica, sans-serif" font-size="${topSize}" font-weight="800" fill="${color}">${label}</text>
+  </g>
   <text x="8" y="126" font-family="Georgia, serif" font-size="52" fill="${color}">${sym}</text>
   <text x="84" y="150" text-anchor="middle" font-family="Georgia, serif" font-size="90" fill="${color}" opacity=".92">${sym}</text>
   <g transform="rotate(180 80 112)">
-    <text x="17" y="42" font-family="Arial, Helvetica, sans-serif" font-size="${bottomSize}" font-weight="800" fill="${color}">${label}</text>
+    <g transform="translate(17 0) scale(0.86 1)">
+      <text x="0" y="42" font-family="Arial, Helvetica, sans-serif" font-size="${bottomSize}" font-weight="800" fill="${color}">${label}</text>
+    </g>
     <text x="17" y="70" font-family="Georgia, serif" font-size="30" fill="${color}">${sym}</text>
   </g>
 </svg>`

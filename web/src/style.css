@@ -8,7 +8,6 @@
   --red: #e25b5b;
   --green: #5fd39a;
   --panel: #14241d;
-  --card-overlap: 2.2vw;
 }
 
 * {
@@ -33,11 +32,37 @@ button {
   font-family: inherit;
 }
 
+#app {
+  --game-vw: 1vw;
+  --game-vh: 1vh;
+  --card-overlap: 2.2;
+}
+#app.portrait-rotated {
+  --game-vw: 1vh;
+  --game-vh: 1vw;
+  --card-overlap: 3;
+}
+.game-rotator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+#app.portrait-rotated .game-rotator {
+  position: fixed;
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: 100vh;
+  height: 100vw;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center center;
+}
 .game {
   position: relative;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
+  width: calc(100 * var(--game-vw));
+  height: calc(100 * var(--game-vh));
   overflow: hidden;
 }
 
@@ -53,8 +78,8 @@ button {
   position: absolute;
   left: 50%;
   top: 46%;
-  width: 62vw;
-  height: 62vw;
+  width: calc(62 * var(--game-vw));
+  height: calc(62 * var(--game-vw));
   max-width: 900px;
   max-height: 900px;
   transform: translate(-50%, -50%);
@@ -68,19 +93,19 @@ button {
 .topbar {
   position: relative;
   z-index: 10;
-  height: 8vh;
+  height: calc(8 * var(--game-vh));
   min-height: 46px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 0 2vw;
+  padding: 0 calc(2 * var(--game-vw));
   pointer-events: none;
 }
 
 .brand {
   display: flex;
   align-items: baseline;
-  gap: 0.6vw;
+  gap: calc(0.6 * var(--game-vw));
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
@@ -90,28 +115,28 @@ button {
 }
 
 .brand-title {
-  font-size: clamp(1.1rem, 2vw, 1.7rem);
+  font-size: clamp(1.1rem, calc(2 * var(--game-vw)), 1.7rem);
   font-weight: 800;
   letter-spacing: 0.12em;
 }
 
 .brand-sub {
   color: var(--muted);
-  font-size: clamp(0.6rem, 0.9vw, 0.8rem);
+  font-size: clamp(0.6rem, calc(0.9 * var(--game-vw)), 0.8rem);
   letter-spacing: 0.18em;
 }
 
 .top-right {
   display: flex;
   align-items: center;
-  gap: 0.7vw;
+  gap: calc(0.7 * var(--game-vw));
   pointer-events: auto;
 }
 
 .conn {
   font-size: 0.72rem;
   color: var(--muted);
-  max-width: 26vw;
+  max-width: calc(26 * var(--game-vw));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -146,7 +171,7 @@ button {
 .my-points {
   font-size: 0.82rem;
   color: var(--gold);
-  max-width: 22vw;
+  max-width: calc(22 * var(--game-vw));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -174,29 +199,29 @@ button {
   position: absolute;
   left: 0;
   right: 0;
-  top: 9vh;
-  height: 28vh;
+  top: calc(9 * var(--game-vh));
+  height: calc(28 * var(--game-vh));
   pointer-events: none;
 }
 
 .seat-slot {
   position: absolute;
-  width: 27vw;
+  width: calc(27 * var(--game-vw));
   max-width: 370px;
   pointer-events: auto;
 }
 .seat-slot.left {
-  left: 2.2vw;
+  left: calc(2.2 * var(--game-vw));
   top: 0;
 }
 .seat-slot.right {
-  right: 2.2vw;
+  right: calc(2.2 * var(--game-vw));
   top: 0;
 }
 
 .seat-card {
   position: relative;
-  padding: 2.25vh 1.25vw 1.2vh;
+  padding: calc(2.25 * var(--game-vh)) calc(1.25 * var(--game-vw)) calc(1.2 * var(--game-vh));
   border-radius: 16px;
   background: linear-gradient(160deg, rgba(9, 36, 26, 0.72), rgba(4, 18, 13, 0.62));
   border: 1px solid rgba(240, 195, 106, 0.22);
@@ -204,7 +229,7 @@ button {
   backdrop-filter: blur(8px);
   cursor: pointer;
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-  min-height: 12vh;
+  min-height: calc(12 * var(--game-vh));
 }
 .seat-card.turn {
   border-color: var(--gold);
@@ -222,10 +247,10 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.3vh;
+  gap: calc(0.3 * var(--game-vh));
   border-style: dashed;
   color: var(--muted);
-  min-height: 13vh;
+  min-height: calc(13 * var(--game-vh));
   width: 100%;
   font: inherit;
   text-align: center;
@@ -250,7 +275,7 @@ button {
 .seat-main {
   display: flex;
   align-items: center;
-  gap: 0.8vw;
+  gap: calc(0.8 * var(--game-vw));
   min-width: 0;
 }
 .avatar-host {
@@ -265,7 +290,7 @@ button {
   display: flex;
   align-items: center;
   gap: 0.4em;
-  font-size: clamp(0.85rem, 1.15vw, 1.05rem);
+  font-size: clamp(0.85rem, calc(1.15 * var(--game-vw)), 1.05rem);
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -276,7 +301,7 @@ button {
   display: flex;
   gap: 0.7em;
   margin-top: 0.2em;
-  font-size: clamp(0.62rem, 0.8vw, 0.76rem);
+  font-size: clamp(0.62rem, calc(0.8 * var(--game-vw)), 0.76rem);
   color: var(--muted);
   white-space: nowrap;
 }
@@ -288,7 +313,7 @@ button {
 }
 .seat-state {
   margin-top: 0.2em;
-  font-size: clamp(0.6rem, 0.78vw, 0.74rem);
+  font-size: clamp(0.6rem, calc(0.78 * var(--game-vw)), 0.74rem);
   color: var(--gold);
   min-height: 1.1em;
   white-space: nowrap;
@@ -389,7 +414,7 @@ button {
   background: #121713;
   border: 2px solid var(--gold);
   color: var(--gold);
-  font-size: clamp(0.95rem, 1.2vw, 1.15rem);
+  font-size: clamp(0.95rem, calc(1.2 * var(--game-vw)), 1.15rem);
   font-weight: 700;
   opacity: 0.78;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
@@ -480,14 +505,14 @@ button {
 
 .top-hud {
   position: absolute;
-  top: 5.4vh;
+  top: calc(5.4 * var(--game-vh));
   left: 50%;
   transform: translateX(-50%);
   z-index: 6;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25vh;
+  gap: calc(0.25 * var(--game-vh));
   pointer-events: none;
 }
 
@@ -502,9 +527,9 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.8vh;
+  gap: calc(0.8 * var(--game-vh));
   pointer-events: none;
-  width: 52vw;
+  width: calc(52 * var(--game-vw));
   max-width: 760px;
 }
 .center.dealing {
@@ -521,8 +546,8 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3vh;
-  min-height: 5vh;
+  gap: calc(0.3 * var(--game-vh));
+  min-height: calc(5 * var(--game-vh));
   transition: opacity 0.12s ease;
 }
 .bottom-cards.flying {
@@ -565,23 +590,23 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.25vh;
+  gap: calc(0.25 * var(--game-vh));
   padding: 0;
-  max-width: 40vw;
+  max-width: calc(40 * var(--game-vw));
 }
 .table-action.self {
   left: 50%;
-  bottom: calc(28.5vh + 4.8vw);
+  bottom: calc(28.5 * var(--game-vh) + 4.8 * var(--game-vw));
   transform: translateX(-50%);
 }
 .table-action.left {
-  left: 25vw;
-  top: calc(46% - 4.8vw);
+  left: calc(25 * var(--game-vw));
+  top: calc(46% - calc(4.8 * var(--game-vw)));
   transform: translate(-50%, -50%);
 }
 .table-action.right {
-  right: 25vw;
-  top: calc(46% - 4.8vw);
+  right: calc(25 * var(--game-vw));
+  top: calc(46% - calc(4.8 * var(--game-vw)));
   transform: translate(50%, -50%);
 }
 .table-action .double-choice {
@@ -608,8 +633,8 @@ button {
   gap: 1px;
 }
 .action-cards .card {
-  width: clamp(42px, 5.1vw, 76px);
-  margin-left: -1.5vw;
+  width: clamp(42px, calc(5.1 * var(--game-vw)), 76px);
+  margin-left: calc(-1.5 * var(--game-vw));
 }
 .action-cards .card:first-child {
   margin-left: 0;
@@ -618,7 +643,7 @@ button {
   border-radius: 5px;
 }
 .selection-hint {
-  font-size: clamp(0.66rem, 0.78vw, 0.76rem);
+  font-size: clamp(0.66rem, calc(0.78 * var(--game-vw)), 0.76rem);
   color: #ffb3b3;
   padding: 0.25em 0.55em;
   border-radius: 999px;
@@ -628,10 +653,10 @@ button {
 .center-empty {
   color: rgba(220, 240, 228, 0.55);
   font-size: 0.82rem;
-  padding: 1vh 0;
+  padding: calc(1 * var(--game-vh)) 0;
 }
 .center-status {
-  font-size: clamp(1.17rem, 1.5vw, 1.38rem);
+  font-size: clamp(1.17rem, calc(1.5 * var(--game-vw)), 1.38rem);
   color: var(--muted);
   text-align: center;
   min-height: 1.4em;
@@ -661,7 +686,7 @@ button {
   color: #ffb3b3;
 }
 .countdown {
-  font-size: clamp(2rem, 5vw, 4rem);
+  font-size: clamp(2rem, calc(5 * var(--game-vw)), 4rem);
   font-weight: 900;
   color: var(--gold);
   text-shadow: 0 0 24px rgba(240, 195, 106, 0.45);
@@ -674,18 +699,18 @@ button {
 }
 .multiplier {
   position: absolute;
-  left: calc(100% + 0.6vw);
-  top: 0.4vh;
+  left: calc(100% + calc(0.6 * var(--game-vw)));
+  top: calc(0.4 * var(--game-vh));
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  gap: 0.2vh;
+  gap: calc(0.2 * var(--game-vh));
   min-height: 0;
   white-space: nowrap;
 }
 .mult-item {
-  font-size: clamp(0.66rem, 0.85vw, 0.8rem);
+  font-size: clamp(0.66rem, calc(0.85 * var(--game-vw)), 0.8rem);
   color: var(--muted);
   padding: 0.15em 0.6em;
   border-radius: 999px;
@@ -704,14 +729,14 @@ button {
 
 .spectator-bar {
   position: absolute;
-  top: 25.5vh;
+  top: calc(25.5 * var(--game-vh));
   left: 50%;
   transform: translateX(-50%);
   z-index: 4;
   display: flex;
   align-items: center;
-  gap: 0.6vw;
-  padding: 0.35vh 0.8vw;
+  gap: calc(0.6 * var(--game-vw));
+  padding: calc(0.35 * var(--game-vh)) calc(0.8 * var(--game-vw));
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -720,7 +745,7 @@ button {
 }
 .spectator-bar.in-seat {
   position: absolute;
-  right: 0.4vw;
+  right: calc(0.4 * var(--game-vw));
   bottom: -15px;
   top: auto;
   left: auto;
@@ -729,7 +754,7 @@ button {
   min-height: 0;
   margin: 0;
   padding: 0;
-  gap: 0.15vw;
+  gap: calc(0.15 * var(--game-vw));
   flex-wrap: nowrap;
   justify-content: flex-end;
   border-radius: 0;
@@ -781,27 +806,27 @@ button {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 36vh;
+  height: calc(36 * var(--game-vh));
   z-index: 4;
   pointer-events: none;
 }
 .self-seat {
   position: absolute;
-  left: 1.8vw;
-  bottom: 20.5vh;
-  width: 20vw;
+  left: calc(1.8 * var(--game-vw));
+  bottom: calc(20.5 * var(--game-vh));
+  width: calc(20 * var(--game-vw));
   max-width: 280px;
   pointer-events: auto;
 }
 .self-seat .seat-card {
-  min-height: 10vh;
+  min-height: calc(10 * var(--game-vh));
 }
 .hand-wrap {
   position: absolute;
   left: 50%;
-  bottom: 3.6vh;
+  bottom: calc(3.6 * var(--game-vh));
   transform: translateX(-50%);
-  width: 97vw;
+  width: calc(97 * var(--game-vw));
   display: flex;
   justify-content: center;
   pointer-events: auto;
@@ -811,7 +836,7 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 17vh;
+  min-height: calc(17 * var(--game-vh));
   justify-content: flex-end;
   touch-action: none;
 }
@@ -820,25 +845,25 @@ button {
   align-items: flex-end;
   justify-content: center;
   width: 100%;
-  padding: 0 1vw;
+  padding: 0 calc(1 * var(--game-vw));
 }
 .hand-cards .card {
-  margin-left: calc(var(--card-overlap) * -1);
+  margin-left: calc(var(--card-overlap) * var(--game-vw) * -1);
   transition: transform 0.12s ease, filter 0.12s ease;
 }
 .hand-cards .card:first-child {
   margin-left: 0;
 }
 .hand-cards.backs .card {
-  margin-left: -0.9vw;
+  margin-left: calc(-0.9 * var(--game-vw));
 }
 .hand-empty {
   color: rgba(220, 240, 228, 0.55);
   font-size: 0.9rem;
-  padding: 3vh 0;
+  padding: calc(3 * var(--game-vh)) 0;
 }
 .spectator-hand-label {
-  margin-bottom: 0.8vh;
+  margin-bottom: calc(0.8 * var(--game-vh));
   font-size: 0.76rem;
   color: var(--gold);
   padding: 0.2em 0.8em;
@@ -853,7 +878,7 @@ button {
 .card {
   position: relative;
   flex: 0 0 auto;
-  width: clamp(42px, 5.1vw, 76px);
+  width: clamp(42px, calc(5.1 * var(--game-vw)), 76px);
   aspect-ratio: 160 / 224;
   padding: 0;
   border: none;
@@ -870,11 +895,11 @@ button {
   pointer-events: none;
 }
 .card.selected {
-  transform: translateY(-1.8vh);
+  transform: translateY(calc(-1.8 * var(--game-vh)));
   filter: drop-shadow(0 0 8px rgba(240, 195, 106, 0.85));
 }
 .card:hover {
-  transform: translateY(-1.8vh);
+  transform: translateY(calc(-1.8 * var(--game-vh)));
 }
 .card.selected img {
   box-shadow: 0 0 0 2px var(--gold), 0 8px 18px rgba(0, 0, 0, 0.35);
@@ -884,7 +909,7 @@ button {
   pointer-events: none;
 }
 .card.small {
-  width: clamp(33px, 3.5vw, 51px);
+  width: clamp(33px, calc(3.5 * var(--game-vw)), 51px);
 }
 .card.small img {
   border-radius: 4px;
@@ -909,13 +934,13 @@ button {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  margin-top: 0.6vh;
-  min-height: 3vh;
+  margin-top: calc(0.6 * var(--game-vh));
+  min-height: calc(3 * var(--game-vh));
   pointer-events: none;
 }
 .opponent-backs .card {
-  width: clamp(16px, 1.45vw, 24px);
-  margin-left: -0.5vw;
+  width: clamp(16px, calc(1.45 * var(--game-vw)), 24px);
+  margin-left: calc(-0.5 * var(--game-vw));
 }
 .opponent-backs .card:first-child {
   margin-left: 0;
@@ -929,16 +954,16 @@ button {
   position: absolute;
   left: 50%;
   right: auto;
-  bottom: 20.5vh;
+  bottom: calc(20.5 * var(--game-vh));
   transform: translateX(-50%);
   z-index: 6;
   display: flex;
   align-items: center;
-  gap: 0.55vw;
+  gap: calc(0.55 * var(--game-vw));
   pointer-events: auto;
   flex-wrap: wrap;
   justify-content: center;
-  max-width: 70vw;
+  max-width: calc(70 * var(--game-vw));
 }
 .my-countdown {
   flex: 0 0 100%;
@@ -946,7 +971,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 0.2em;
-  font-size: clamp(1.8rem, 3.2vw, 2.6rem);
+  font-size: clamp(1.8rem, calc(3.2 * var(--game-vw)), 2.6rem);
   font-weight: 800;
   color: var(--gold);
   opacity: 0.78;
@@ -970,7 +995,7 @@ button {
   border: 0;
   background: transparent;
   color: var(--ink);
-  font-size: clamp(0.78rem, 1vw, 0.92rem);
+  font-size: clamp(0.78rem, calc(1 * var(--game-vw)), 0.92rem);
   cursor: pointer;
   user-select: none;
 }
@@ -984,13 +1009,13 @@ button {
   font-weight: 800;
 }
 .btn {
-  padding: 1.28vh 2.03vw;
+  padding: calc(1.28 * var(--game-vh)) calc(2.03 * var(--game-vw));
   min-width: 108px;
   border-radius: 999px;
   border: 1px solid rgba(240, 195, 106, 0.45);
   background: rgba(6, 26, 18, 0.72);
   color: var(--ink);
-  font-size: clamp(1.17rem, 1.47vw, 1.43rem);
+  font-size: clamp(1.17rem, calc(1.47 * var(--game-vw)), 1.43rem);
   font-weight: 600;
   cursor: pointer;
   backdrop-filter: blur(8px);
@@ -1015,7 +1040,7 @@ button {
 }
 .btn.tiny {
   min-width: 0;
-  padding: 0.83vh 1.35vw;
+  padding: calc(0.83 * var(--game-vh)) calc(1.35 * var(--game-vw));
   font-size: 1.11rem;
   font-weight: 500;
   opacity: 0.85;
@@ -1026,8 +1051,8 @@ button {
 }
 .waiting {
   color: var(--muted);
-  font-size: clamp(0.72rem, 0.9vw, 0.86rem);
-  padding: 0.7vh 1vw;
+  font-size: clamp(0.72rem, calc(0.9 * var(--game-vw)), 0.86rem);
+  padding: calc(0.7 * var(--game-vh)) calc(1 * var(--game-vw));
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.2);
 }
@@ -1043,42 +1068,40 @@ button {
 
 .chat-panel {
   position: absolute;
-  right: 1.4vw;
-  bottom: 21.5vh;
+  right: calc(1.4 * var(--game-vw));
+  bottom: calc(21.5 * var(--game-vh));
   z-index: 6;
-  width: 22vw;
+  width: calc(22 * var(--game-vw));
   max-width: 320px;
-  max-height: 12vh;
+  height: calc(12 * var(--game-vh));
   display: none;
   flex-direction: column;
   border-radius: 12px;
   background: rgba(5, 22, 15, 0.72);
-  border: 1px solid rgba(240, 195, 106, 0.18);
   backdrop-filter: blur(6px);
   overflow: hidden;
   pointer-events: auto;
 }
 .chat-head {
   flex: 0 0 auto;
-  padding: 0.5vh 0.6vw;
+  padding: calc(0.5 * var(--game-vh)) calc(0.6 * var(--game-vw));
   font-size: 0.68rem;
   letter-spacing: 0.16em;
   color: var(--gold);
-  border-bottom: 1px solid rgba(240, 195, 106, 0.12);
 }
 .chat-list {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 0.45vh 0.5vw;
+  padding: calc(0.45 * var(--game-vh)) calc(0.5 * var(--game-vw));
   display: flex;
   flex-direction: column;
-  gap: 0.35vh;
+  gap: calc(0.35 * var(--game-vh));
 }
 .chat-row {
   display: flex;
   align-items: flex-start;
-  gap: 0.35vw;
+  gap: calc(0.35 * var(--game-vw));
 }
 .chat-avatar {
   flex: 0 0 auto;
@@ -1119,26 +1142,26 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3vh 3vw;
+  padding: calc(3 * var(--game-vh)) calc(3 * var(--game-vw));
   animation: fadeIn 0.18s ease-out;
 }
 .panel {
-  width: min(92vw, 680px);
-  max-height: 84vh;
+  width: min(calc(92 * var(--game-vw)), 680px);
+  max-height: calc(84 * var(--game-vh));
   overflow: auto;
   border-radius: 20px;
   border: 1px solid rgba(240, 195, 106, 0.4);
   background: linear-gradient(160deg, #1b2f26, #0d1c16 70%);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
-  padding: 2.4vh 2.4vw;
+  padding: calc(2.4 * var(--game-vh)) calc(2.4 * var(--game-vw));
   color: var(--ink);
 }
 .panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1vw;
-  margin-bottom: 1.4vh;
+  gap: calc(1 * var(--game-vw));
+  margin-bottom: calc(1.4 * var(--game-vh));
 }
 .panel-head h3 {
   margin: 0;
@@ -1148,19 +1171,19 @@ button {
 .panel-actions {
   display: flex;
   justify-content: center;
-  gap: 1vw;
-  margin-top: 2vh;
+  gap: calc(1 * var(--game-vw));
+  margin-top: calc(2 * var(--game-vh));
   flex-wrap: wrap;
 }
 .result-panel {
-  width: min(92vw, 544px);
+  width: min(calc(92 * var(--game-vw)), 544px);
   text-align: center;
 }
 .result-title {
-  font-size: clamp(1.6rem, 3.2vw, 2.6rem);
+  font-size: clamp(1.6rem, calc(3.2 * var(--game-vw)), 2.6rem);
   font-weight: 900;
   letter-spacing: 0.12em;
-  margin-bottom: 0.4vh;
+  margin-bottom: calc(0.4 * var(--game-vh));
 }
 .result-title.win {
   color: var(--gold);
@@ -1176,7 +1199,7 @@ button {
 .result-sub {
   color: var(--muted);
   font-size: 0.86rem;
-  margin-bottom: 1vh;
+  margin-bottom: calc(1 * var(--game-vh));
 }
 .result-sub b {
   color: var(--gold);
@@ -1185,8 +1208,8 @@ button {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 0.4vw 0.9vw;
-  margin-bottom: 1.6vh;
+  gap: calc(0.4 * var(--game-vw)) calc(0.9 * var(--game-vw));
+  margin-bottom: calc(1.6 * var(--game-vh));
   font-size: 0.74rem;
   color: var(--muted);
 }
@@ -1201,7 +1224,7 @@ button {
 .result-rows {
   display: flex;
   flex-direction: column;
-  gap: 0.6vh;
+  gap: calc(0.6 * var(--game-vh));
   margin: 0 auto;
   max-width: 100%;
 }
@@ -1209,8 +1232,8 @@ button {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 70px 76px;
   align-items: center;
-  gap: 0.5vw;
-  padding: 0.8vh 0.8vw;
+  gap: calc(0.5 * var(--game-vw));
+  padding: calc(0.8 * var(--game-vh)) calc(0.8 * var(--game-vw));
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -1276,19 +1299,19 @@ button {
 .board-list {
   display: flex;
   flex-direction: column;
-  gap: 0.35vh;
+  gap: calc(0.35 * var(--game-vh));
 }
 .board-loading {
   text-align: center;
   color: var(--muted);
-  padding: 4vh 0;
+  padding: calc(4 * var(--game-vh)) 0;
 }
 .board-row {
   display: grid;
   grid-template-columns: 34px 32px 1fr 76px 86px;
   align-items: center;
-  gap: 0.5vw;
-  padding: 0.55vh 0.6vw;
+  gap: calc(0.5 * var(--game-vw));
+  padding: calc(0.55 * var(--game-vh)) calc(0.6 * var(--game-vw));
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
   font-size: 0.82rem;
@@ -1318,7 +1341,7 @@ button {
   text-align: right;
 }
 .board-me {
-  margin-top: 1.2vh;
+  margin-top: calc(1.2 * var(--game-vh));
   text-align: center;
   color: var(--gold);
   font-size: 0.8rem;
@@ -1328,14 +1351,14 @@ button {
 .spec-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
-  gap: 1vh 0.8vw;
+  gap: calc(1 * var(--game-vh)) calc(0.8 * var(--game-vw));
 }
 .spec-cell {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3vh;
-  padding: 0.8vh 0.3vw;
+  gap: calc(0.3 * var(--game-vh));
+  padding: calc(0.8 * var(--game-vh)) calc(0.3 * var(--game-vw));
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
   font-size: 0.72rem;
@@ -1352,7 +1375,7 @@ button {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 23vh;
+  bottom: calc(23 * var(--game-vh));
   transform: translateX(-50%) translateY(10px);
   z-index: 10000;
   padding: 0.7em 1.2em;
@@ -1364,7 +1387,7 @@ button {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.18s, transform 0.18s;
-  max-width: 80vw;
+  max-width: calc(80 * var(--game-vw));
   text-align: center;
 }
 .toast.show {
@@ -1445,44 +1468,44 @@ button {
 /* ---------------- 响应式 ---------------- */
 
 @media (max-width: 900px) {
-  :root {
-    --card-overlap: 3vw;
+  #app {
+    --card-overlap: 3;
   }
   .seat-slot {
-    width: 33vw;
+    width: calc(33 * var(--game-vw));
   }
   .seat-slot.left {
-    left: 1.2vw;
+    left: calc(1.2 * var(--game-vw));
   }
   .seat-slot.right {
-    right: 1.2vw;
+    right: calc(1.2 * var(--game-vw));
   }
   .seat-card {
-    padding: 1.8vh 1vw 1vh;
+    padding: calc(1.8 * var(--game-vh)) calc(1 * var(--game-vw)) calc(1 * var(--game-vh));
   }
   .seat-state {
     font-size: 0.6rem;
   }
   .self-seat {
-    width: 28vw;
-    left: 1vw;
-    bottom: 19vh;
+    width: calc(28 * var(--game-vw));
+    left: calc(1 * var(--game-vw));
+    bottom: calc(19 * var(--game-vh));
   }
   .hand-wrap {
-    bottom: 2.6vh;
-    width: 99vw;
+    bottom: calc(2.6 * var(--game-vh));
+    width: calc(99 * var(--game-vw));
   }
   .actions {
     left: 50%;
     right: auto;
-    bottom: 19vh;
+    bottom: calc(19 * var(--game-vh));
     transform: translateX(-50%);
-    max-width: 80vw;
-    gap: 0.8vw;
+    max-width: calc(80 * var(--game-vw));
+    gap: calc(0.8 * var(--game-vw));
     justify-content: center;
   }
   .btn {
-    padding: 1.05vh 1.65vw;
+    padding: calc(1.05 * var(--game-vh)) calc(1.65 * var(--game-vw));
     min-width: 87px;
     font-size: 1.14rem;
   }
@@ -1496,90 +1519,76 @@ button {
   }
   .center {
     top: 40%;
-    width: 62vw;
+    width: calc(62 * var(--game-vw));
   }
   .spectator-bar {
-    top: 24vh;
-    padding: 0.25vh 0.6vw;
+    top: calc(24 * var(--game-vh));
+    padding: calc(0.25 * var(--game-vh)) calc(0.6 * var(--game-vw));
   }
   .spec-label {
     font-size: 0.62rem;
   }
   .chat-panel {
-    width: 28vw;
+    width: calc(28 * var(--game-vw));
     max-width: 260px;
-    bottom: 20.5vh;
-    max-height: 10vh;
+    height: calc(10 * var(--game-vh));
+    bottom: calc(20.5 * var(--game-vh));
   }
   .top-hud {
-    top: 5vh;
+    top: calc(5 * var(--game-vh));
   }
   .table-action.self {
-    bottom: calc(27vh + 4.2vw);
+    bottom: calc(27 * var(--game-vh) + 4.2 * var(--game-vw));
   }
   .table-action.left {
-    left: 22vw;
+    left: calc(22 * var(--game-vw));
   }
   .table-action.right {
-    right: 22vw;
+    right: calc(22 * var(--game-vw));
   }
 }
 
-@media (max-height: 520px) {
+@media (max-height: 520px), (orientation: portrait) and (max-width: 520px) {
   .topbar {
-    height: 7vh;
+    height: calc(7 * var(--game-vh));
     min-height: 38px;
   }
   .opponents {
-    top: 7vh;
-    height: 26vh;
+    top: calc(7 * var(--game-vh));
+    height: calc(26 * var(--game-vh));
   }
   .seat-card {
-    min-height: 10vh;
+    min-height: calc(10 * var(--game-vh));
   }
   .seat-state {
     display: none;
   }
   .self-area {
-    height: 40vh;
+    height: calc(40 * var(--game-vh));
   }
   .hand-wrap {
-    bottom: 2.4vh;
+    bottom: calc(2.4 * var(--game-vh));
   }
   .hand {
-    min-height: 15vh;
+    min-height: calc(15 * var(--game-vh));
   }
   .spectator-bar {
-    top: 24.5vh;
+    top: calc(24.5 * var(--game-vh));
   }
   .top-hud {
-    top: 4.4vh;
+    top: calc(4.4 * var(--game-vh));
   }
   .center {
     top: 41%;
   }
   .actions {
-    bottom: 17.5vh;
+    bottom: calc(17.5 * var(--game-vh));
   }
   .self-seat {
-    bottom: 17.5vh;
+    bottom: calc(17.5 * var(--game-vh));
   }
   .table-action.self {
-    bottom: calc(24vh + 4.2vw);
+    bottom: calc(24 * var(--game-vh) + 4.2 * var(--game-vw));
   }
 }
 
-@media (orientation: portrait) and (max-width: 900px) {
-  .rotate-tip {
-    display: flex;
-    position: fixed;
-    inset: 0;
-    z-index: 200;
-    align-items: center;
-    justify-content: center;
-    background: #0b2a1e;
-    color: var(--gold);
-    font-size: 1.2rem;
-    letter-spacing: 0.2em;
-  }
-}
