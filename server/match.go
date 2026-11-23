@@ -73,6 +73,7 @@ type Match struct {
 	Caller        int
 	RobQueue      []int
 	BidActions    [3]string
+	CallPassed    [3]bool // 叫地主阶段主动“不叫”的座位
 	RedealCount   int
 
 	Double        [3]bool
@@ -416,6 +417,7 @@ func (h *Hub) beginDealLocked() {
 	m.RobQueue = nil
 	m.FinalChance = false
 	m.BidActions = [3]string{}
+	m.CallPassed = [3]bool{}
 	m.Double = [3]bool{}
 	m.DoubleDone = [3]bool{}
 	m.DoubleActions = [3]string{}
@@ -465,17 +467,32 @@ func (h *Hub) bidLocked(seat int, action string) string {
 			return "请选择叫地主或不叫"
 		}
 		m.BidActions[seat] = action
+		if action == "pass" {
+			m.CallPassed[seat] = true
+		}
 		if action == "call" {
 			m.Caller = seat
 			m.Landlord = seat
-			// 进入抢地主阶段后，清掉叫地主阶段的“不叫”状态，
-			// 否则还没轮到抢的人会提前显示成“不抢”。
+			// 清空上一阶段动作；主动“不叫”的座位在下面统一记为“不抢”。
 			m.BidActions = [3]string{}
 			m.BidActions[seat] = "call"
 			m.BidStage = "rob"
 			m.RobCount = 0
 			m.FinalChance = false
-			m.RobQueue = []int{nextIndex(seat), nextIndex(nextIndex(seat))}
+			// 叫地主阶段主动“不叫”的玩家，不进入抢地主队列，直接记为不抢。
+			// 没有轮到叫地主、别人先叫而结束的玩家仍然可以抢。
+			m.RobQueue = nil
+			for _, s := range []int{nextIndex(seat), nextIndex(nextIndex(seat))} {
+				if m.CallPassed[s] {
+					m.BidActions[s] = "pass"
+					continue
+				}
+				m.RobQueue = append(m.RobQueue, s)
+			}
+			if len(m.RobQueue) == 0 {
+				h.startDoublingLocked()
+				return ""
+			}
 			m.BidTurn = m.RobQueue[0]
 			m.Turn = m.BidTurn
 			h.armTimerLocked(h.cfg.BidSeconds)
@@ -501,6 +518,7 @@ func (h *Hub) bidLocked(seat int, action string) string {
 			m.Hands = hands
 			m.Bottom = bottom
 			m.BidActions = [3]string{}
+			m.CallPassed = [3]bool{}
 			m.RobMultiplier = 1
 			m.BidTurn = rand.Intn(3)
 			m.Turn = m.BidTurn
@@ -725,6 +743,10 @@ func (h *Hub) playLocked(seat int, cards []rules.Card) string {
 		return ""
 	}
 	m.Turn = nextIndex(seat)
+	// 轮到下一家时，先清掉他上一轮的出牌结果，避免旧牌继续显示。
+	if m.Turn >= 0 && m.Turn < 3 {
+		m.LastActions[m.Turn] = nil
+	}
 	h.armTurnLocked(h.cfg.TurnSeconds)
 	return ""
 }
@@ -764,6 +786,9 @@ func (h *Hub) passLocked(seat int) string {
 		m.LastActions = [3]*ActionInfo{}
 	} else {
 		m.Turn = nextIndex(seat)
+		if m.Turn >= 0 && m.Turn < 3 {
+			m.LastActions[m.Turn] = nil
+		}
 	}
 	h.armTurnLocked(h.cfg.TurnSeconds)
 	return ""

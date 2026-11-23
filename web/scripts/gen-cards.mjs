@@ -30,7 +30,6 @@ function cardSVG(rank, suit) {
   const label = rankLabel(rank)
   const { sym, color } = suits[suit]
   const topSize = 78
-  const bottomSize = 54
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 224" width="160" height="224">
   <defs><filter id="s" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity=".18"/></filter></defs>
   <rect x="3" y="3" width="154" height="218" rx="14" fill="#fdfdfb" stroke="#cfc7b8" stroke-width="2" filter="url(#s)"/>
@@ -41,10 +40,10 @@ function cardSVG(rank, suit) {
   <text x="8" y="126" font-family="Georgia, serif" font-size="52" fill="${color}">${sym}</text>
   <text x="84" y="150" text-anchor="middle" font-family="Georgia, serif" font-size="90" fill="${color}" opacity=".92">${sym}</text>
   <g transform="rotate(180 80 112)">
-    <g transform="translate(17 0) scale(0.86 1)">
-      <text x="0" y="42" font-family="Arial, Helvetica, sans-serif" font-size="${bottomSize}" font-weight="800" fill="${color}">${label}</text>
+    <g transform="translate(8 0) scale(0.86 1)">
+      <text x="0" y="72" font-family="Arial, Helvetica, sans-serif" font-size="${topSize}" font-weight="800" fill="${color}">${label}</text>
     </g>
-    <text x="17" y="70" font-family="Georgia, serif" font-size="30" fill="${color}">${sym}</text>
+    <text x="8" y="126" font-family="Georgia, serif" font-size="52" fill="${color}">${sym}</text>
   </g>
 </svg>`
 }

@@ -439,6 +439,26 @@ button {
   background: rgba(120, 20, 20, 0.25);
   font-size: 0.72rem;
 }
+.bid-tag {
+  display: inline-block;
+  padding: 0.15em 0.7em;
+  border-radius: 999px;
+  border: 1px solid rgba(240, 195, 106, 0.45);
+  color: var(--gold);
+  background: rgba(120, 80, 10, 0.24);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.bid-tag.pass {
+  border-color: rgba(255, 160, 160, 0.45);
+  color: #ffc0c0;
+  background: rgba(120, 20, 20, 0.25);
+}
+.bid-tag.rob {
+  border-color: rgba(240, 195, 106, 0.7);
+  color: #ffe1a1;
+  background: rgba(150, 95, 15, 0.34);
+}
 .combo-tag {
   font-size: 0.65rem;
   color: var(--muted);
@@ -1069,11 +1089,11 @@ button {
 .chat-panel {
   position: absolute;
   right: calc(1.4 * var(--game-vw));
-  bottom: calc(21.5 * var(--game-vh));
+  top: calc(66.5 * var(--game-vh));
+  bottom: 0;
   z-index: 6;
   width: calc(22 * var(--game-vw));
   max-width: 320px;
-  height: calc(12 * var(--game-vh));
   display: none;
   flex-direction: column;
   border-radius: 12px;
@@ -1088,6 +1108,33 @@ button {
   font-size: 0.68rem;
   letter-spacing: 0.16em;
   color: var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4em;
+}
+.chat-new {
+  display: none;
+  border: 1px solid rgba(240, 195, 106, 0.35);
+  border-radius: 999px;
+  padding: 0.2em 0.6em;
+  background: rgba(240, 195, 106, 0.12);
+  color: var(--gold);
+  font-size: 0.62rem;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.chat-new.show {
+  display: inline-flex;
+}
+.chat-empty {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(220, 240, 228, 0.45);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
 }
 .chat-list {
   flex: 1 1 auto;
@@ -1120,6 +1167,7 @@ button {
 .chat-text {
   color: #e8f4ec;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 .chat-emotion {
   max-width: 60px;
@@ -1531,8 +1579,8 @@ button {
   .chat-panel {
     width: calc(28 * var(--game-vw));
     max-width: 260px;
-    height: calc(10 * var(--game-vh));
-    bottom: calc(20.5 * var(--game-vh));
+    top: calc(69.5 * var(--game-vh));
+    bottom: 0;
   }
   .top-hud {
     top: calc(5 * var(--game-vh));

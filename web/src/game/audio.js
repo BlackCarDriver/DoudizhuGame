@@ -45,13 +45,18 @@ export class Audio {
   }
 
   prime() {
+    // 首次用户手势时恢复 AudioContext，避免合成音一直处于 suspended。
+    const ctx = this.ensure()
+    if (ctx?.state === 'suspended') ctx.resume?.().catch(() => {})
+    if (this.muted) return
     if (this._primed) return
     this._primed = true
-    if (this.muted) return
     try {
       let audio = this.files.get(SFX.deal)
       if (!audio) {
-        audio = new Audio(SFX.deal)
+        // 类名也叫 Audio，这里必须显式使用 window.Audio，
+        // 否则会实例化本类而不是 HTMLAudioElement，MP3 完全不会播放。
+        audio = new window.Audio(SFX.deal)
         audio.preload = 'auto'
         this.files.set(SFX.deal, audio)
       }
@@ -75,7 +80,7 @@ export class Audio {
     try {
       let audio = this.files.get(url)
       if (!audio) {
-        audio = new Audio(url)
+        audio = new window.Audio(url)
         audio.preload = 'auto'
         this.files.set(url, audio)
       }

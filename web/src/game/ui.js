@@ -47,6 +47,12 @@ export class UI {
     this.boardLoading = false
     this.modalHTML = ''
     this.modalToken = ''
+    this.chatKey = ''
+    this.chatAtBottom = true
+    this.chatNew = false
+    this.actionsHTML = ''
+    this.centerKey = ''
+    this.tableActionsHTML = ''
 
     this.fxClass = ''
     this.lastTickSecond = -1
@@ -101,7 +107,10 @@ export class UI {
         </div>
 
         <div class="chat-panel" id="chat-panel">
-          <div class="chat-head">聊天</div>
+          <div class="chat-head">
+            <span>聊天</span>
+            <button class="chat-new" id="chat-new" data-act="chat-bottom" type="button">新消息 ↓</button>
+          </div>
           <div class="chat-list" id="chat-list"></div>
         </div>
 
@@ -113,6 +122,12 @@ export class UI {
     `
     this.modalHTML = ''
     this.modalToken = ''
+    this.chatKey = ''
+    this.chatAtBottom = true
+    this.chatNew = false
+    this.actionsHTML = ''
+    this.centerKey = ''
+    this.tableActionsHTML = ''
     this._onViewportChange = () => this.syncOrientation()
     window.addEventListener('resize', this._onViewportChange)
     window.addEventListener('orientationchange', this._onViewportChange)
@@ -132,6 +147,14 @@ export class UI {
       this.audio.prime()
     }, { once: true })
     this.app.querySelector('#hand')?.addEventListener('pointerdown', (e) => this._onHandPointerDown(e))
+    this.app.querySelector('#chat-list')?.addEventListener('scroll', () => {
+      const list = this.app.querySelector('#chat-list')
+      if (!list) return
+      const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 24
+      this.chatAtBottom = nearBottom
+      if (nearBottom) this.chatNew = false
+      this.renderChatNew()
+    }, { passive: true })
     window.addEventListener('keydown', this._onKey)
   }
 
@@ -273,6 +296,9 @@ export class UI {
         break
       case 'board':
         this.openBoard()
+        break
+      case 'chat-bottom':
+        this.scrollChatBottom()
         break
       case 'board-close':
         this.showBoard = false
@@ -642,12 +668,20 @@ export class UI {
     const view = this.viewSeat()
     const left = prevSeat(view)
     const right = nextSeat(view)
-    const leftEl = this.app.querySelector('#seat-left')
-    const rightEl = this.app.querySelector('#seat-right')
-    const selfEl = this.app.querySelector('#self-info')
-    if (leftEl) leftEl.innerHTML = this.seatCard(left, 'top')
-    if (rightEl) rightEl.innerHTML = this.seatCard(right, 'top')
-    if (selfEl) selfEl.innerHTML = this.seatCard(view, 'self')
+    this._paintSeat(this.app.querySelector('#seat-left'), left, 'top')
+    this._paintSeat(this.app.querySelector('#seat-right'), right, 'top')
+    this._paintSeat(this.app.querySelector('#self-info'), view, 'self')
+  }
+
+  _paintSeat(el, seat, pos) {
+    if (!el) return
+    const html = this.seatCard(seat, pos)
+    const token = this.online.shell.token || ''
+    // 同一份座位 HTML 不重复替换 DOM，避免聊天气泡的 CSS 动画和图片反复重载。
+    if (el._seatHTML === html && el._seatToken === token) return
+    el._seatHTML = html
+    el._seatToken = token
+    el.innerHTML = html
   }
 
   seatCard(seat, pos) {
@@ -664,14 +698,12 @@ export class UI {
     const isSelf = seat === this.viewSeat()
     const role = info.role || ''
     const roleFrame = role === 'landlord' ? LANDLORD_FRAME : role === 'farmer' ? FARMER_FRAME : ''
-    const bid = this.bidText(info, m)
     const dbl = info.double === 'double' ? '加倍' : info.double === 'pass' ? '不加倍' : ''
     const stateBits = []
     const watchingInRoom = (this.online.snap?.spectators || []).some((s) => s.nick === info.nick)
     if (!info.connected) stateBits.push(watchingInRoom ? '已离座 · 托管' : '离线 · 托管')
     else if (info.auto) stateBits.push('托管中')
     if (info.ready && m?.phase !== 'playing' && m?.phase !== 'doubling' && m?.phase !== 'bidding') stateBits.push('已准备')
-    if (bid) stateBits.push(bid)
     const bubble = this.bubbleHTML(this.online.bubbleFor(seat))
     const clock = isTurn && seat !== this.online.mySeat() ? this.clockHTML(this.online.remainingSeconds()) : ''
     const classes = ['seat-card', pos, isTurn ? 'turn' : '', isSelf ? 'is-self' : '', info.auto || !info.connected ? 'is-auto' : '', role === 'landlord' ? 'landlord' : '']
@@ -720,14 +752,14 @@ export class UI {
       const w = b.width || '4.5em'
       const h = b.height || 'auto'
       if (!/^https?:\/\//i.test(b.url || '')) return ''
-      return `<div class="bubble emotion"><img src="${escapeHTML(b.url)}" alt="${escapeHTML(b.text)}" style="width:${escapeHTML(w)};height:${escapeHTML(h)}" /></div>`
+      return `<div class="bubble emotion" data-at="${b.at || ''}"><img src="${escapeHTML(b.url)}" alt="${escapeHTML(b.text)}" style="width:${escapeHTML(w)};height:${escapeHTML(h)}" /></div>`
     }
-    return `<div class="bubble text">${escapeHTML(b.text)}</div>`
+    return `<div class="bubble text" data-at="${b.at || ''}">${escapeHTML(b.text)}</div>`
   }
 
-  clockHTML(sec) {
-    const s = Math.max(0, Math.ceil(sec))
-    return `<div class="clock ${s <= 10 ? 'urgent' : ''}" data-clock><span class="clock-icon">⏰</span><span class="clock-num">${s}</span></div>`
+  clockHTML() {
+    // 秒数由 tick() 原地更新；这里保持 HTML 稳定，避免座位重绘导致气泡动画重启。
+    return `<div class="clock" data-clock><span class="clock-icon">⏰</span><span class="clock-num"></span></div>`
   }
 
   renderCenter() {
@@ -738,12 +770,21 @@ export class UI {
     if (!bottomEl) return
 
     if (!m) {
-      bottomEl.innerHTML = ''
       const seated = this.online.snap?.seated || 0
+      const key = `none:${seated}`
+      if (key === this.centerKey) return
+      this.centerKey = key
+      bottomEl.innerHTML = ''
       statusEl.innerHTML = `<div class="center-empty">${seated >= 3 ? '等待玩家准备' : '等待玩家上座'}</div>`
       multEl.innerHTML = ''
       return
     }
+
+    const bottomKey = (m.bottom || []).map((c) => c.id).join(',')
+    const resultKey = m.result ? `${m.result.winnerSide}:${m.result.publicMultiplier}:${m.result.spring}:${m.result.antiSpring}` : ''
+    const key = `${m.id}:${m.phase}:${m.turn}:${m.publicMultiplier}:${m.bidding?.stage || ''}:${bottomKey}:${resultKey}`
+    if (key === this.centerKey) return
+    this.centerKey = key
 
     if (m.phase === 'countdown' || m.phase === 'bidding') {
       bottomEl.innerHTML = `<div class="bottom-label">底牌</div><div class="mini-cards">${cardBackHTML({ small: true })}${cardBackHTML({ small: true })}${cardBackHTML({ small: true })}</div>`
@@ -796,9 +837,14 @@ export class UI {
       { seat: prevSeat(view), pos: 'left' },
       { seat: nextSeat(view), pos: 'right' },
     ]
-    el.innerHTML = seats
+    const html = seats
       .map(({ seat, pos }) => {
         const info = this.online.seatAt(seat)
+        if (m.phase === 'bidding') {
+          const text = info ? this.bidText(info, m) : ''
+          if (!text) return ''
+          return `<div class="table-action ${pos}"><span class="bid-tag ${info.bid}">${text}</span></div>`
+        }
         if (m.phase === 'doubling') {
           if (!info?.double) return ''
           return `<div class="table-action ${pos}"><span class="double-choice">${info.double === 'double' ? '加倍' : '不加倍'}</span></div>`
@@ -813,6 +859,9 @@ export class UI {
         </div>`
       })
       .join('')
+    if (html === this.tableActionsHTML) return
+    this.tableActionsHTML = html
+    el.innerHTML = html
   }
 
   renderHand() {
@@ -921,8 +970,7 @@ export class UI {
       (m.phase === 'bidding' || m.phase === 'doubling' || m.phase === 'playing') &&
       (this.online.isMyTurn() || m.phase === 'doubling')
     ) {
-      const sec = Math.max(0, Math.ceil(this.online.remainingSeconds()))
-      parts.push(`<div class="my-countdown" data-clock><span class="clock-icon">⏰</span><span class="clock-num">${sec}</span></div>`)
+      parts.push(`<div class="my-countdown" data-clock><span class="clock-icon">⏰</span><span class="clock-num"></span></div>`)
     }
 
     if (!mySeat) {
@@ -988,7 +1036,10 @@ export class UI {
       parts.push(`<span class="waiting">等待中…</span>`)
     }
 
-    el.innerHTML = parts.join('')
+    const html = parts.join('')
+    if (html === this.actionsHTML) return
+    this.actionsHTML = html
+    el.innerHTML = html
   }
 
   audienceHTML(seat) {
@@ -1009,17 +1060,27 @@ export class UI {
     const panel = this.app.querySelector('#chat-panel')
     const list = this.app.querySelector('#chat-list')
     if (!panel || !list) return
+    panel.style.display = 'flex'
     const chats = this.online.chatLog || []
     if (!chats.length) {
-      panel.style.display = 'none'
+      if (this.chatKey !== 'empty') {
+        this.chatKey = 'empty'
+        list.innerHTML = '<div class="chat-empty">暂无聊天</div>'
+      }
+      this.chatNew = false
+      this.renderChatNew()
       return
     }
     const last = chats[chats.length - 1]
-    const key = `${chats.length}:${last.at}:${last.nick}:${last.text}:${last.url || ''}`
-    if (key === this.chatKey) return
+    const token = this.online.shell.token || ''
+    const key = `${chats.length}:${last.at}:${last.nick}:${last.text}:${last.url || ''}:${token}`
+    if (key === this.chatKey) {
+      this.renderChatNew()
+      return
+    }
+    const wasBottom = this.chatAtBottom !== false
+    const prevTop = list.scrollTop
     this.chatKey = key
-    panel.style.display = 'flex'
-    const token = this.online.shell.token
     list.innerHTML = chats
       .map((c) => {
         const av = avatarHTML(
@@ -1033,7 +1094,30 @@ export class UI {
         return `<div class="chat-row"><span class="chat-avatar">${av}</span><div class="chat-body"><span class="chat-nick">${escapeHTML(c.nick)}</span>${body}</div></div>`
       })
       .join('')
+    if (wasBottom) {
+      list.scrollTop = list.scrollHeight
+      this.chatNew = false
+      this.chatAtBottom = true
+    } else {
+      // 用户正在看历史消息，不强行拉到底，只显示新消息提示。
+      list.scrollTop = Math.min(prevTop, Math.max(0, list.scrollHeight - list.clientHeight))
+      this.chatNew = true
+    }
+    this.renderChatNew()
+  }
+
+  renderChatNew() {
+    const btn = this.app.querySelector('#chat-new')
+    if (btn) btn.classList.toggle('show', !!this.chatNew)
+  }
+
+  scrollChatBottom() {
+    const list = this.app.querySelector('#chat-list')
+    if (!list) return
     list.scrollTop = list.scrollHeight
+    this.chatAtBottom = true
+    this.chatNew = false
+    this.renderChatNew()
   }
 
   renderModals() {

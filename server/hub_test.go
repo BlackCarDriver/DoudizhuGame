@@ -586,7 +586,7 @@ func TestCallerGetsFinalChanceAfterOneRob(t *testing.T) {
 	}
 }
 
-func TestCallPassStatusClearedWhenRobStarts(t *testing.T) {
+func TestCallPassBecomesRobPassWhenRobStarts(t *testing.T) {
 	h := newTestHub(t)
 	startGame(t, h)
 
@@ -611,8 +611,8 @@ func TestCallPassStatusClearedWhenRobStarts(t *testing.T) {
 	if h.match.BidStage != "rob" {
 		t.Fatalf("叫地主后应进入抢地主，得到 %s", h.match.BidStage)
 	}
-	if h.match.BidActions[first] != "" {
-		t.Fatalf("叫地主阶段的不叫状态不应带到抢地主阶段，得到 %q", h.match.BidActions[first])
+	if h.match.BidActions[first] != "pass" {
+		t.Fatalf("叫地主阶段不叫的人进入抢地主后应直接记为不抢，得到 %q", h.match.BidActions[first])
 	}
 	if h.match.BidActions[caller] != "call" {
 		t.Fatalf("原叫地主者应保留叫地主标记，得到 %q", h.match.BidActions[caller])
@@ -738,5 +738,103 @@ func TestSettleAppliesRakeAndDailyBonus(t *testing.T) {
 				t.Fatalf("地主活跃奖励/最终积分错误：%+v", p)
 			}
 		}
+	}
+}
+
+func TestTurnStartClearsPreviousAction(t *testing.T) {
+	h := newTestHub(t)
+	startGame(t, h)
+	bidFirstCallThenAllRob(t, h)
+	doubleAll(t, h)
+
+	h.lock.Lock()
+	m := h.match
+	landlord := m.Landlord
+	next := nextIndex(landlord)
+	m.Hands[landlord] = []rules.Card{rules.CardByID(0), rules.CardByID(4)}
+	m.LastActions[next] = &ActionInfo{Seat: next, Pass: true}
+	card := m.Hands[landlord][0]
+	nick := h.seats[landlord].Nick
+	h.lock.Unlock()
+
+	if err := h.play(nick, []int{card.ID}); err != "" {
+		t.Fatalf("play: %s", err)
+	}
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	if h.match.LastActions[next] != nil {
+		t.Fatalf("轮到下一家时，应清空其上一轮动作，得到 %+v", h.match.LastActions[next])
+	}
+}
+
+func TestCallPasserCannotRob(t *testing.T) {
+	h := newTestHub(t)
+	startGame(t, h)
+
+	h.lock.Lock()
+	first := h.match.BidTurn
+	firstNick := h.seats[first].Nick
+	h.lock.Unlock()
+	if err := h.bid(firstNick, "pass"); err != "" {
+		t.Fatalf("first pass: %s", err)
+	}
+
+	h.lock.Lock()
+	caller := h.match.BidTurn
+	callerNick := h.seats[caller].Nick
+	h.lock.Unlock()
+	if err := h.bid(callerNick, "call"); err != "" {
+		t.Fatalf("call: %s", err)
+	}
+
+	h.lock.Lock()
+	if h.match.Phase != "bidding" || h.match.BidStage != "rob" {
+		phase, stage := h.match.Phase, h.match.BidStage
+		h.lock.Unlock()
+		t.Fatalf("应进入抢地主，得到 %s/%s", phase, stage)
+	}
+	if h.match.BidTurn == first {
+		h.lock.Unlock()
+		t.Fatal("叫地主阶段不叫的人不应再获得抢地主回合")
+	}
+	if h.match.BidActions[first] != "pass" {
+		got := h.match.BidActions[first]
+		h.lock.Unlock()
+		t.Fatalf("不叫的人应直接记为不抢，得到 %q", got)
+	}
+	h.lock.Unlock()
+}
+
+func TestCallPasserAndOtherPassEndsBidding(t *testing.T) {
+	h := newTestHub(t)
+	startGame(t, h)
+
+	h.lock.Lock()
+	first := h.match.BidTurn
+	firstNick := h.seats[first].Nick
+	h.lock.Unlock()
+	if err := h.bid(firstNick, "pass"); err != "" {
+		t.Fatalf("first pass: %s", err)
+	}
+	h.lock.Lock()
+	caller := h.match.BidTurn
+	callerNick := h.seats[caller].Nick
+	h.lock.Unlock()
+	if err := h.bid(callerNick, "call"); err != "" {
+		t.Fatalf("call: %s", err)
+	}
+	h.lock.Lock()
+	thirdNick := h.seats[h.match.BidTurn].Nick
+	h.lock.Unlock()
+	if err := h.bid(thirdNick, "pass"); err != "" {
+		t.Fatalf("third pass: %s", err)
+	}
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	if h.match.Phase != "doubling" {
+		t.Fatalf("不叫的人被跳过且另一家不抢后应进入 doubling，得到 %s", h.match.Phase)
+	}
+	if h.match.RobMultiplier != 1 {
+		t.Fatalf("无人抢地主时倍数应为 1，得到 %d", h.match.RobMultiplier)
 	}
 }
