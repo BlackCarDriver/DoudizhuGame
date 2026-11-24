@@ -1019,9 +1019,15 @@ export class UI {
         : ''
     const audience = this.audienceHTML(seat)
     const revealedCards = Array.isArray(info.revealedCards) ? info.revealedCards : []
-    const showRevealed = !!info.revealed && seat !== this.online.mySeat() && revealedCards.length > 0
+    const finalRemain =
+      m?.phase === 'over' && m.result
+        ? (m.result.players || []).find((p) => p.seat === seat)?.remain || []
+        : []
+    const showFinalRemain = seat !== this.online.mySeat() && Array.isArray(finalRemain) && finalRemain.length > 0
+    const shownRevealed = showFinalRemain ? finalRemain : revealedCards
+    const showRevealed = showFinalRemain || (!!info.revealed && seat !== this.online.mySeat() && revealedCards.length > 0)
     const revealedHTML = showRevealed
-      ? `<div class="revealed-hand">${sortCardsDesc(revealedCards).map((c) => cardHTML(c, { small: true, disabled: true })).join('')}</div>`
+      ? `<div class="revealed-hand">${sortCardsDesc(shownRevealed).map((c) => cardHTML(c, { small: true, disabled: true })).join('')}</div>`
       : ''
     return `<div class="${classes}" data-seat="${seat}" ${watch}>
       ${clock}
@@ -1458,7 +1464,6 @@ export class UI {
           <span class="rr-name"><span class="rr-nick">${escapeHTML(p.nick)}</span><span class="rr-role ${p.role}">${roleText(p.role)}</span>${p.double ? '<small>加倍</small>' : ''}${p.tableFee ? `<small>桌费-${p.tableFee}</small>` : ''}${p.dailyBonus ? `<small>活跃+${p.dailyBonus}</small>` : ''}</span>
           <span class="rr-delta ${p.delta >= 0 ? 'up' : 'down'}">${fmtDelta(p.delta)}</span>
           <span class="rr-points">${p.points} 分</span>
-          ${Array.isArray(p.remain) ? `<div class="rr-remain"><span class="rr-remain-label">剩牌</span>${p.remain.length ? sortCardsDesc(p.remain).map((c) => cardHTML(c, { small: true, disabled: true })).join('') : '<span class="rr-remain-empty">已出完</span>'}</div>` : ''}
         </div>`,
       )
       .join('')
@@ -1466,6 +1471,7 @@ export class UI {
     const myReady = !!mySeat && !!this.online.snap?.seats?.[mySeat]?.ready
     return `<div class="modal-mask">
       <div class="panel result-panel">
+        <button class="icon-btn result-close" data-act="dismiss-result" title="关闭">✕</button>
         <div class="result-title ${titleClass}">${title}</div>
         <div class="result-sub">公共倍数 <b>x${r.publicMultiplier}</b></div>
         <div class="mult-breakdown">

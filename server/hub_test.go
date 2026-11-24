@@ -747,6 +747,63 @@ func TestSettleAppliesRakeAndDailyBonus(t *testing.T) {
 	}
 }
 
+func TestSecondPassActionVisibleUntilNextLead(t *testing.T) {
+	h := newTestHub(t)
+	startGame(t, h)
+	bidFirstCallThenAllRob(t, h)
+	doubleAll(t, h)
+
+	h.lock.Lock()
+	m := h.match
+	landlord := m.Landlord
+	firstPass := nextIndex(landlord)
+	secondPass := nextIndex(firstPass)
+	landlordNick := h.seats[landlord].Nick
+	firstPassNick := h.seats[firstPass].Nick
+	secondPassNick := h.seats[secondPass].Nick
+	leadCard := m.Hands[landlord][0]
+	nextLeadCard := m.Hands[landlord][1]
+	h.lock.Unlock()
+
+	if err := h.play(landlordNick, []int{leadCard.ID}); err != "" {
+		t.Fatalf("play lead: %s", err)
+	}
+	if err := h.pass(firstPassNick); err != "" {
+		t.Fatalf("first pass: %s", err)
+	}
+	h.lock.Lock()
+	if got := h.match.LastActions[firstPass]; got == nil || !got.Pass {
+		h.lock.Unlock()
+		t.Fatalf("第一次不出应保留在 state 中，得到 %+v", got)
+	}
+	h.lock.Unlock()
+
+	if err := h.pass(secondPassNick); err != "" {
+		t.Fatalf("second pass: %s", err)
+	}
+	h.lock.Lock()
+	secondAction := h.match.LastActions[secondPass]
+	if secondAction == nil || !secondAction.Pass {
+		h.lock.Unlock()
+		t.Fatalf("第二次不出应保留到下一次出牌前，得到 %+v", secondAction)
+	}
+	if h.match.Turn != landlord || h.match.LastPlay != nil {
+		gotTurn, gotLastPlay := h.match.Turn, h.match.LastPlay
+		h.lock.Unlock()
+		t.Fatalf("两家不出后应回到最后出牌者重新首出，得到 turn=%d lastPlay=%+v", gotTurn, gotLastPlay)
+	}
+	h.lock.Unlock()
+
+	if err := h.play(landlordNick, []int{nextLeadCard.ID}); err != "" {
+		t.Fatalf("play next lead: %s", err)
+	}
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	if h.match.LastActions[firstPass] != nil || h.match.LastActions[secondPass] != nil {
+		t.Fatalf("进入新一轮出牌后应清空上一轮不出动作，得到 %+v", h.match.LastActions)
+	}
+}
+
 func TestTurnStartClearsPreviousAction(t *testing.T) {
 	h := newTestHub(t)
 	startGame(t, h)

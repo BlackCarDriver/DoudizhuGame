@@ -763,6 +763,11 @@ func (h *Hub) playLocked(seat int, cards []rules.Card) string {
 	if !ok {
 		return "手牌里没有这些牌"
 	}
+	// 两家都过牌后进入新一轮，清空上一轮桌面动作；但第二次“不出”
+	// 必须先保留到本次 state 广播里，否则客户端收不到该动作音效。
+	if m.LastPlay == nil {
+		m.LastActions = [3]*ActionInfo{}
+	}
 	m.Hands[seat] = next
 	m.PlayCount[seat]++
 	if combo.Type == rules.Bomb || combo.Type == rules.Rocket {
@@ -817,7 +822,6 @@ func (h *Hub) passLocked(seat int) string {
 		m.Turn = m.LastPlayer
 		m.LastPlay = nil
 		m.PassCount = 0
-		m.LastActions = [3]*ActionInfo{}
 	} else {
 		m.Turn = nextIndex(seat)
 		if m.Turn >= 0 && m.Turn < 3 {

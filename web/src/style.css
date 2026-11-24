@@ -1363,8 +1363,15 @@ button {
   flex-wrap: wrap;
 }
 .result-panel {
+  position: relative;
   width: min(calc(92 * var(--game-vw)), 544px);
   text-align: center;
+}
+.result-close {
+  position: absolute;
+  top: calc(1.2 * var(--game-vh));
+  right: calc(1.2 * var(--game-vw));
+  z-index: 1;
 }
 .result-title {
   font-size: clamp(1.6rem, calc(3.2 * var(--game-vw)), 2.6rem);
